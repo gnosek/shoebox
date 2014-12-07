@@ -108,8 +108,12 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     unshare(CLONE_NEWNS|CLONE_NEWIPC|CLONE_NEWUTS|CLONE_NEWPID)
     pid = os.fork()
     if pid:
-        os.waitpid(pid, 0)
-        os._exit(0)
+        _, ret = os.waitpid(pid, 0)
+        exitcode = ret >> 8
+        sig = ret & 0x7f
+        if sig:
+            exitcode = 128 + sig
+        os._exit(exitcode)
 
     def target_subdir(path):
         return os.path.join(target, path.lstrip('/'))
