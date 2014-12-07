@@ -1,6 +1,7 @@
 from ctypes import CDLL
 import click
 import os
+import logging
 
 libc = CDLL('libc.so.6')
 
@@ -27,6 +28,9 @@ MS_MGC_VAL = 0xC0ED0000
 MNT_DETACH = 2
 
 
+logger = logging.getLogger('shoebox')
+
+
 def unshare(flags):
     if libc.unshare(flags) != 0:
         # errno gets clobbered so that's all we know
@@ -36,15 +40,25 @@ def unshare(flags):
 def build_uid_map(base_uid, subuid_count):
     uidmap = [
         # uid inside, uid outside, count
-        (0, base_uid, 1),  # map base_uid to userns root
-        (1, (base_uid * subuid_count) + 1, subuid_count - 1)  # map rest of userns uid space
+        (0, base_uid, 1)  # map base_uid to userns root
     ]
-    return '\n'.join(' '.join(str(i) for i in uidmap))
+
+    if os.geteuid() == 0:
+        # only root may map to others' uids
+        uidmap.append(
+            (1, (base_uid * subuid_count) + 1, subuid_count - 1)  # map rest of userns uid space
+        )
+    else:
+        logging.warn('not running as root, setting up identity user map only')
+    return '\n'.join('{0} {1} {2}'.format(*s) for s in uidmap)
 
 
 def create_userns(subuid_count=100000):
     pid = os.fork()
+    rd, wr = os.pipe()
     if pid == 0:  # child
+        os.close(wr)
+        os.read(rd, 1)
         parent = os.getppid()
         uid_map = build_uid_map(os.getuid(), subuid_count)
         with open('/proc/{0}/uid_map'.format(parent), 'w') as fp:
@@ -53,11 +67,13 @@ def create_userns(subuid_count=100000):
             print >> fp, uid_map
         os._exit(0)
     else:
+        os.close(rd)
         unshare(CLONE_NEWUSER)
+        os.close(wr)
         os.waitpid(pid, 0)
 
 def mount(device, target, fstype, flags, options):
-    if libc.mount(device, target, fstype, flags, options) < 0:
+    if libc.mount(device, target, fstype, flags | MS_MGC_VAL, options) < 0:
         raise OSError('Failed to mount {0} at {1}'.format(device, target))
 
 
@@ -90,6 +106,10 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
         volumes = []
 
     unshare(CLONE_NEWNS|CLONE_NEWIPC|CLONE_NEWUTS|CLONE_NEWPID)
+    pid = os.fork()
+    if pid:
+        os.waitpid(pid, 0)
+        os._exit(0)
 
     def target_subdir(path):
         return os.path.join(target, path.lstrip('/'))
@@ -102,14 +122,18 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
         bind_mount(volume_source, real_target, rec=True)
 
     target_proc = target_subdir('/proc')
-    mount('procfs', target_proc, 'procfs', MS_NOEXEC|MS_NODEV|MS_NOSUID, None)
+    mount('proc', target_proc, 'proc', MS_NOEXEC|MS_NODEV|MS_NOSUID, None)
     for path in ('sysrq-trigger', 'sys', 'irq', 'bus'):
         abs_path = os.path.join(target_proc, path)
         bind_mount(abs_path, abs_path)
         bind_mount(abs_path, abs_path, readonly=True)
 
     target_sys = target_subdir('/sys')
-    bind_mount('/sys', target_sys, readonly=True)
+    try:
+        bind_mount('/sys', target_sys)
+        bind_mount(target_sys, target_sys, readonly=True)
+    except OSError:
+        logger.debug('Failed to mount sysfs, probably not owned by us')
 
     old_root = target_subdir('/mnt')
     pivot_root(target, old_root)
@@ -122,13 +146,13 @@ def drop_capabilities():
 
 
 def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash', subuid_count=100000):
-    source_dir = os.path.join(containers_dir, str(image_id))
+    source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
-    upper_dir = os.path.join(delta_dir, str(image_id))
+    upper_dir = os.path.join(delta_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(upper_dir):
         os.makedirs(upper_dir, mode=0o700)
-    target_dir = os.path.join(runtime_dir, str(image_id))
+    target_dir = os.path.join(runtime_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(target_dir):
         os.makedirs(target_dir, mode=0o700)
 
@@ -144,9 +168,10 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
 @click.option('--delta-dir', default='delta', help='container overlay repository')
 @click.option('--runtime-dir', default='runtime', help='container runtime directory')
 @click.option('--subuid-count', default=100000, help='number of subuids to allocate')
-@click.argument('image_id', help='image ID in repository')
-@click.argument('entry_point', help='binary to execute in container')
-def cli(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash', subuid_count=100000):
-    if volumes:
-        volumes = [v.split(':', 1) for v in volumes]
-    run_image(image_id, volumes, containers_dir, delta_dir, runtime_dir, entry_point, subuid_count)
+@click.argument('image_id')
+@click.argument('entry_point')
+def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash', subuid_count=100000):
+    logging.basicConfig(level=logging.INFO)
+    if volume:
+        volume = [v.split(':', 1) for v in volume]
+    run_image(image_id, volume, containers_dir, delta_dir, runtime_dir, entry_point, subuid_count)
