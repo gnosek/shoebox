@@ -9,7 +9,7 @@ setup(
     author='Grzegorz Nosek',
     author_email='root@localdomain.pl',
     description='Tiny docker replacement',
-    requires=['requests', 'click'],
+    install_requires=['requests', 'click'],
     entry_points='''
         [console_scripts]
         shoebox-pull=shoebox.pull:pull
