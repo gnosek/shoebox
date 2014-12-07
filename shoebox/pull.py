@@ -84,7 +84,7 @@ class ImageRepository(object):
         return metadata
 
     def download_image(self, image_id, force=False):
-        path = os.path.join(self.storage_dir, image_id + '.tar.gz')
+        path = os.path.join(self.storage_dir, image_id)
         if not force and os.path.exists(path):
             #  already downloaded
             return path
@@ -132,7 +132,7 @@ class ImageRepository(object):
 
         for image_id in reversed(self.ancestors(target_image_id)):
             layer = self.download_image(image_id, force=force_download)
-            subprocess.check_call(['tar', 'xzf', layer, '-C', target_dir])
+            subprocess.check_call(['tar', 'xf', layer, '-C', target_dir])
 
         self.logger.info('Unpacked {0}:{1} in {2}'.format(image, tag, target_dir))
         return target_dir
