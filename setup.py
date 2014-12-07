@@ -14,5 +14,6 @@ setup(
         [console_scripts]
         shoebox-pull=shoebox.pull:pull
         shoebox-unpack=shoebox.pull:unpack
+        shoebox-nsrun=shoebox.namespaces:cli
     ''',
 )
