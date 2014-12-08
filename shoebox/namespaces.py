@@ -71,6 +71,7 @@ def create_userns(subuid_count=100000):
         unshare(CLONE_NEWUSER)
         os.close(wr)
         os.waitpid(pid, 0)
+        os.setgroups([0])
 
 def mount(device, target, fstype, flags, options):
     if libc.mount(device, target, fstype, flags | MS_MGC_VAL, options) < 0:
