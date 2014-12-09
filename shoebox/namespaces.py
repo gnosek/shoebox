@@ -1,7 +1,10 @@
 from ctypes import CDLL
+import getpass
 import click
+import itertools
 import os
 import logging
+import subprocess
 from shoebox.capabilities import drop_caps
 
 libc = CDLL('libc.so.6')
@@ -38,34 +41,40 @@ def unshare(flags):
         raise OSError('Failed to unshare {0:x}'.format(flags))
 
 
-def build_uid_map(base_uid, subuid_count):
-    uidmap = [
-        # uid inside, uid outside, count
-        (0, base_uid, 1)  # map base_uid to userns root
-    ]
+def load_id_map(path, base_id):
+    username = getpass.getuser()
+    yield 0, base_id, 1
+    lower_id = 1
+    with open(path) as fp:
+        for n, line in enumerate(fp):
+            map_login, id_min, id_count = line.strip().split(':')
+            if map_login != username:
+                continue
+            id_min = int(id_min)
+            id_count = int(id_count)
+            yield lower_id, id_min, id_min+id_count
+            lower_id += id_count
+            if n == 3:
+                # arbitrary kernel limit of five entries
+                # we're counting from 0 and using one for root mapping
+                break
 
-    if os.geteuid() == 0:
-        # only root may map to others' uids
-        uidmap.append(
-            (1, (base_uid * subuid_count) + 1, subuid_count - 1)  # map rest of userns uid space
-        )
-    else:
-        logging.warn('not running as root, setting up identity user map only')
-    return '\n'.join('{0} {1} {2}'.format(*s) for s in uidmap)
+
+def apply_id_maps(pid):
+    uid_map = itertools.chain(*load_id_map('/etc/subuid', os.getuid()))
+    gid_map = itertools.chain(*load_id_map('/etc/subgid', os.getgid()))
+
+    subprocess.check_call(['newuidmap', str(pid)] + [str(uid) for uid in uid_map])
+    subprocess.check_call(['newgidmap', str(pid)] + [str(gid) for gid in gid_map])
 
 
-def create_userns(subuid_count=100000):
+def create_userns():
     pid = os.fork()
     rd, wr = os.pipe()
     if pid == 0:  # child
         os.close(wr)
         os.read(rd, 1)
-        parent = os.getppid()
-        uid_map = build_uid_map(os.getuid(), subuid_count)
-        with open('/proc/{0}/uid_map'.format(parent), 'w') as fp:
-            print >> fp, uid_map
-        with open('/proc/{0}/gid_map'.format(parent), 'w') as fp:
-            print >> fp, uid_map
+        apply_id_maps(os.getppid())
         os._exit(0)
     else:
         os.close(rd)
@@ -147,7 +156,7 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     unmount_subtree('/mnt')
 
 
-def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash', subuid_count=100000):
+def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash'):
     source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
@@ -158,7 +167,7 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
     if not os.path.exists(target_dir):
         os.makedirs(target_dir, mode=0o700)
 
-    create_userns(subuid_count=subuid_count)
+    create_userns()
     create_namespaces(source_dir, upper_dir, target_dir, volumes)
     drop_caps()
     os.execv(entry_point, [entry_point])
@@ -169,11 +178,10 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
 @click.option('--containers-dir', default='containers', help='container image repository')
 @click.option('--delta-dir', default='delta', help='container overlay repository')
 @click.option('--runtime-dir', default='runtime', help='container runtime directory')
-@click.option('--subuid-count', default=100000, help='number of subuids to allocate')
 @click.argument('image_id')
 @click.argument('entry_point')
-def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash', subuid_count=100000):
+def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash'):
     logging.basicConfig(level=logging.INFO)
     if volume:
         volume = [v.split(':', 1) for v in volume]
-    run_image(image_id, volume, containers_dir, delta_dir, runtime_dir, entry_point, subuid_count)
+    run_image(image_id, volume, containers_dir, delta_dir, runtime_dir, entry_point)
