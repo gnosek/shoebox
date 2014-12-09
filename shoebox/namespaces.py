@@ -43,8 +43,7 @@ def unshare(flags):
 
 def load_id_map(path, base_id):
     username = getpass.getuser()
-    yield 0, base_id, 1
-    lower_id = 1
+    lower_id = 0
     with open(path) as fp:
         for n, line in enumerate(fp):
             map_login, id_min, id_count = line.strip().split(':')
@@ -52,11 +51,11 @@ def load_id_map(path, base_id):
                 continue
             id_min = int(id_min)
             id_count = int(id_count)
-            yield lower_id, id_min, id_min+id_count
+            yield lower_id, id_min, id_count
             lower_id += id_count
-            if n == 3:
+            if n == 4:
                 # arbitrary kernel limit of five entries
-                # we're counting from 0 and using one for root mapping
+                # we're counting from 0
                 break
 
 
@@ -81,7 +80,6 @@ def create_userns():
         unshare(CLONE_NEWUSER)
         os.close(wr)
         os.waitpid(pid, 0)
-        os.setgroups([0])
 
 def mount(device, target, fstype, flags, options):
     if libc.mount(device, target, fstype, flags | MS_MGC_VAL, options) < 0:
@@ -162,14 +160,19 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
         raise RuntimeError('{0} does not exist'.format(source_dir))
     upper_dir = os.path.join(delta_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(upper_dir):
-        os.makedirs(upper_dir, mode=0o700)
+        os.makedirs(upper_dir, mode=0o755)
     target_dir = os.path.join(runtime_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(target_dir):
-        os.makedirs(target_dir, mode=0o700)
+        os.makedirs(target_dir, mode=0o755)
 
     create_userns()
     create_namespaces(source_dir, upper_dir, target_dir, volumes)
     drop_caps()
+    os.seteuid(0)
+    os.setegid(0)
+    os.setuid(0)
+    os.setgid(0)
+    os.setgroups([0])
     os.execv(entry_point, [entry_point])
 
 
