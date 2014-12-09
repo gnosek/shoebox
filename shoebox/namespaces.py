@@ -2,6 +2,7 @@ from ctypes import CDLL
 import click
 import os
 import logging
+from shoebox.capabilities import drop_caps
 
 libc = CDLL('libc.so.6')
 
@@ -146,10 +147,6 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     unmount_subtree('/mnt')
 
 
-def drop_capabilities():
-    pass
-
-
 def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash', subuid_count=100000):
     source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(source_dir):
@@ -163,7 +160,7 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
 
     create_userns(subuid_count=subuid_count)
     create_namespaces(source_dir, upper_dir, target_dir, volumes)
-    drop_capabilities()
+    drop_caps()
     os.execv(entry_point, [entry_point])
 
 
