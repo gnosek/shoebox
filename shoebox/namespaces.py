@@ -73,6 +73,8 @@ def create_userns():
     if pid == 0:  # child
         os.close(wr)
         os.read(rd, 1)
+        # todo: user identity mapping (w/o suid helper): uid -> uid or uid -> 0
+        # will need to change setuid call later
         apply_id_maps(os.getppid())
         os._exit(0)
     else:
