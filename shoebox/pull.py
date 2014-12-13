@@ -126,7 +126,6 @@ class ImageRepository(object):
         tags = self.list_tags(image)
         target_image_id = tags[tag]
 
-        target_dir = os.path.join(target_dir, str(target_image_id))
         if not os.path.exists(target_dir):
             os.makedirs(target_dir, mode=0o755)
 
@@ -146,30 +145,18 @@ class ImageRepository(object):
 
 
 @click.command()
-@click.option('--storage-dir', default='images', help='image repository')
+@click.option('--storage-dir', default='~/.shoebox/images', help='image repository')
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
 @click.option('--force/--no-force', default=False, help='force download')
 @click.option('--tag', default='latest', help='tag to pull')
 @click.argument('image')
 def pull(image, tag='latest', force=False, index_url=DEFAULT_INDEX, storage_dir='images'):
     logging.basicConfig(level=logging.DEBUG)
-    repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
+    repo = ImageRepository(index_url=index_url, storage_dir=os.path.expanduser(storage_dir))
     metadata = repo.pull(image, tag, force)
 
     import pprint
     pprint.pprint(metadata[-1])
-
-@click.command()
-@click.option('--storage-dir', default='images', help='image repository')
-@click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
-@click.option('--force/--no-force', default=False, help='force download')
-@click.option('--tag', default='latest', help='tag to pull')
-@click.argument('image')
-@click.argument('target_dir')
-def unpack(image, target_dir, tag='latest', force=False, index_url=DEFAULT_INDEX, storage_dir='images'):
-    logging.basicConfig(level=logging.DEBUG)
-    repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
-    repo.unpack(target_dir, image, tag, force)
 
 @click.command()
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')

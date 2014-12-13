@@ -13,7 +13,8 @@ setup(
     entry_points='''
         [console_scripts]
         shoebox-pull=shoebox.pull:pull
-        shoebox-unpack=shoebox.pull:unpack
+        shoebox-build=shoebox.build:build
+
         shoebox-ancestry=shoebox.pull:ancestry
         shoebox-nsrun=shoebox.namespaces:cli
     ''',

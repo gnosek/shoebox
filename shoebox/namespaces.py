@@ -174,23 +174,19 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     unmount_subtree('/mnt')
 
 
-def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime',
-              entry_point='/bin/bash', target_uid=None, target_gid=None):
-    source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
+def run_image(source_dir, delta_dir, runtime_dir, volumes=None, entry_point='/bin/bash', target_uid=None, target_gid=None):
     if not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
-    upper_dir = os.path.join(delta_dir.encode('utf-8'), str(image_id))
-    if not os.path.exists(upper_dir):
-        os.makedirs(upper_dir, mode=0o755)
-    target_dir = os.path.join(runtime_dir.encode('utf-8'), str(image_id))
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir, mode=0o755)
+    if not os.path.exists(delta_dir):
+        os.makedirs(delta_dir, mode=0o755)
+    if not os.path.exists(runtime_dir):
+        os.makedirs(runtime_dir, mode=0o755)
 
     create_userns(target_uid, target_gid)
 
     if target_uid is None and target_gid is None:
         target_uid, target_gid = 0, 0
-    create_namespaces(source_dir, upper_dir, target_dir, volumes)
+    create_namespaces(source_dir, delta_dir, runtime_dir, volumes)
     drop_caps()
     os.seteuid(target_uid)
     os.setegid(target_gid)
@@ -214,4 +210,9 @@ def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', r
     logging.basicConfig(level=logging.INFO)
     if volume:
         volume = [v.split(':', 1) for v in volume]
-    run_image(image_id, volume, containers_dir, delta_dir, runtime_dir, entry_point, target_uid, target_gid)
+    source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
+    if not os.path.exists(source_dir):
+        raise RuntimeError('{0} does not exist'.format(source_dir))
+    upper_dir = os.path.join(delta_dir.encode('utf-8'), str(image_id))
+    target_dir = os.path.join(runtime_dir.encode('utf-8'), str(image_id))
+    run_image(source_dir, upper_dir, target_dir, volume, entry_point, target_uid, target_gid)
