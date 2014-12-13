@@ -3,6 +3,7 @@ import getpass
 import itertools
 import logging
 import subprocess
+import tempfile
 
 import click
 import os
@@ -168,10 +169,12 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     except OSError:
         logger.debug('Failed to mount sysfs, probably not owned by us')
 
-    old_root = target_subdir('/mnt')
+    old_root = tempfile.mkdtemp(prefix='.oldroot', dir=target)
     pivot_root(target, old_root)
     os.chdir('/')
-    unmount_subtree('/mnt')
+    pivoted_old_root = '/' + os.path.basename(old_root)
+    unmount_subtree(pivoted_old_root)
+    os.rmdir(pivoted_old_root)
 
 
 def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, target_uid=None, target_gid=None):
