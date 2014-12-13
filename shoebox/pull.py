@@ -3,7 +3,7 @@ import logging
 import os
 import requests
 import click
-import subprocess
+from shoebox import tar
 
 DEFAULT_INDEX = 'https://index.docker.io'
 
@@ -126,7 +126,7 @@ class ImageRepository(object):
 
         for image_id in reversed(self.ancestors(image_id)):
             layer = self.download_image(image_id, force=force_download)
-            subprocess.check_call(['tar', 'xf', layer, '-C', target_dir])
+            tar.unpack_inside(None, None, target_dir, layer, '/')
 
         self.logger.info('Unpacked {0} in {1}'.format(image_id, target_dir))
         return target_dir

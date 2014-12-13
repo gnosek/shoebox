@@ -144,8 +144,10 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     if volumes is None:
         volumes = []
 
-    overlay_lower = overlay_lower.encode('utf-8')
-    overlay_upper = overlay_upper.encode('utf-8')
+    if overlay_lower is not None:
+        overlay_lower = overlay_lower.encode('utf-8')
+    if overlay_upper is not None:
+        overlay_upper = overlay_upper.encode('utf-8')
     target = target.encode('utf-8')
 
     unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
@@ -161,7 +163,8 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     def target_subdir(path):
         return os.path.join(target, path.lstrip('/'))
 
-    mount('overlayfs', target, 'overlayfs', MS_NOSUID, 'lowerdir={0},upperdir={1}'.format(overlay_lower, overlay_upper))
+    if overlay_lower is not None and overlay_upper is not None:
+        mount('overlayfs', target, 'overlayfs', MS_NOSUID, 'lowerdir={0},upperdir={1}'.format(overlay_lower, overlay_upper))
     for volume_source, volume_target in volumes:
         real_target = target_subdir(volume_target)
         if not os.path.exists(real_target):
