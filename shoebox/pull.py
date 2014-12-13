@@ -143,11 +143,15 @@ class ImageRepository(object):
         target_image_id = tags[tag]
         return list(reversed(self.ancestors(target_image_id)))
 
-    def metadata(self, image, tag='latest'):
+    def metadata(self, image, tag='latest', use_cache=True):
         self.request_access(image)
 
         tags = self.list_tags(image)
         target_image_id = tags[tag]
+        if use_cache:
+            cached_path = os.path.join(self.storage_dir, '{0}.json'.format(target_image_id))
+            if os.path.exists(cached_path):
+                return json.load(open(cached_path))
         return self.image_metadata(target_image_id)
 
 

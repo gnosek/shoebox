@@ -8,7 +8,7 @@ import pyparsing as p
 RunContext = namedtuple('RunContext', 'environ user workdir')
 RunCommand = namedtuple('RunCommand', 'command context')
 AddCommand = namedtuple('AddCommand', 'src_paths dst_path is_copy')
-Dockerfile = namedtuple('Dockerfile', 'base_image context run_commands expose entrypoint volumes command')
+Dockerfile = namedtuple('Dockerfile', 'base_image context run_commands expose entrypoint volumes command repo')
 
 eol = p.LineEnd().suppress()
 sp = p.White().suppress()
@@ -66,7 +66,12 @@ class FROM_command(DockerfileCommand):
 
             :type context: Dockerfile
             """
-            context = context._replace(base_image=(self.image_name, self.tag))
+            assert context.base_image is None
+            if context.repo is None:
+                context = context._replace(base_image=(self.image_name, self.tag))
+            else:
+                metadata = context.repo.metadata(self.image_name, self.tag)
+                return from_docker_metadata(metadata)
             return context
 
 
@@ -388,23 +393,62 @@ def strip_whitespace_after_continuations(s):
     return re.sub(r'\\\s*$', r'\\', s, re.MULTILINE)
 
 
-def parse_dockerfile(dockerfile):
-    dockerfile = strip_whitespace_after_continuations(dockerfile)
+def empty_dockerfile(repo):
     context = RunContext(environ={
         'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
         }, user='root', workdir='/')
-    parsed_dockerfile = Dockerfile(
+    base_dockerfile = Dockerfile(
         base_image=None,
         context=context,
         run_commands=[],
         expose=[],
         entrypoint=None,
         volumes=set(),
-        command=None
+        command=None,
+        repo=repo
     )
+    return base_dockerfile
+
+
+def parse_dockerfile(dockerfile, base_dockerfile=None, repo=None):
+    dockerfile = strip_whitespace_after_continuations(dockerfile)
+    if base_dockerfile is None:
+        parsed_dockerfile = empty_dockerfile(repo)
+    else:
+        parsed_dockerfile = base_dockerfile
     for directive in DockerfileParser.parseString(dockerfile, parseAll=True):
         parsed_dockerfile = directive.evaluate(parsed_dockerfile)
     return parsed_dockerfile
+
+
+def from_docker_metadata(meta_json):
+    config = meta_json['config']
+    context = RunContext(
+        environ=config['Env'],
+        user=config['User'] or 'root',
+        workdir=config['WorkingDir'] or '/')
+
+    if config['ExposedPorts']:
+        ports = [int(port.split('/')[0]) for port in config['ExposedPorts'].keys()]
+    else:
+        ports = []
+
+    if config['Volumes']:
+        volumes = set(config['Volumes'].keys())
+    else:
+        volumes = set()
+
+    dockerfile = Dockerfile(
+        base_image=config['Image'],
+        context=context,
+        run_commands=[],
+        expose=ports,
+        entrypoint=config['Entrypoint'],
+        volumes=volumes,
+        command=None,
+        repo=None,
+    )
+    return dockerfile
 
 
 if __name__ == '__main__':

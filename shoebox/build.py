@@ -15,15 +15,14 @@ def build(base_dir, shoebox_dir, index_url, force):
     logger = logging.getLogger('shoebox.build')
     container_id = os.urandom(32).encode('hex')
     dockerfile_path = os.path.join(base_dir, 'Dockerfile')
-    parsed = parse_dockerfile(open(dockerfile_path).read())
-
-    logger.info(repr(parsed))
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
     storage_dir = os.path.join(shoebox_dir, 'images')
     runtime_dir = os.path.join(shoebox_dir, 'containers')
     target_base = os.path.join(runtime_dir, container_id, 'base')
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
+
+    parsed = parse_dockerfile(open(dockerfile_path).read(), repo=repo)
 
     base_image, base_tag = parsed.base_image
     repo.unpack(target_base, base_image, base_tag, force)
