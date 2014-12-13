@@ -182,4 +182,4 @@ def ancestry(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images')
 def metadata(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images'):
     logging.basicConfig(level=logging.DEBUG)
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
-    print json.dumps(repo.metadata(image, tag))
+    print json.dumps(repo.metadata(image, tag), indent=4)
