@@ -1,11 +1,14 @@
 from ctypes import CDLL
 import getpass
-import click
 import itertools
-import os
 import logging
 import subprocess
+
+import click
+import os
+
 from shoebox.capabilities import drop_caps
+
 
 libc = CDLL('libc.so.6')
 
@@ -31,7 +34,6 @@ MS_MGC_VAL = 0xC0ED0000
 # sys/mount.h
 MNT_DETACH = 2
 
-
 logger = logging.getLogger('shoebox')
 
 
@@ -44,19 +46,21 @@ def unshare(flags):
 def load_id_map(path, base_id):
     username = getpass.getuser()
     lower_id = 0
+    id_ranges = []
     with open(path) as fp:
-        for n, line in enumerate(fp):
+        for line in fp:
             map_login, id_min, id_count = line.strip().split(':')
             if map_login != username:
                 continue
             id_min = int(id_min)
             id_count = int(id_count)
-            yield lower_id, id_min, id_count
-            lower_id += id_count
-            if n == 4:
-                # arbitrary kernel limit of five entries
-                # we're counting from 0
-                break
+            id_ranges.append(((id_min, id_count)))
+
+    # arbitrary kernel limit of five entries
+    # we're counting from 0
+    for id_min, id_count in sorted(id_ranges)[:5]:
+        yield lower_id, id_min, id_count
+        lower_id += id_count
 
 
 def apply_id_maps(pid):
@@ -67,21 +71,35 @@ def apply_id_maps(pid):
     subprocess.check_call(['newgidmap', str(pid)] + [str(gid) for gid in gid_map])
 
 
-def create_userns():
-    pid = os.fork()
-    rd, wr = os.pipe()
-    if pid == 0:  # child
-        os.close(wr)
-        os.read(rd, 1)
-        # todo: user identity mapping (w/o suid helper): uid -> uid or uid -> 0
-        # will need to change setuid call later
-        apply_id_maps(os.getppid())
-        os._exit(0)
-    else:
-        os.close(rd)
-        unshare(CLONE_NEWUSER)
-        os.close(wr)
-        os.waitpid(pid, 0)
+def single_id_map(map_name, id_inside, id_outside):
+    with open('/proc/self/{0}_map'.format(map_name), 'w') as fp:
+        print >> fp, '{0} {1} 1'.format(id_inside, id_outside)
+
+
+def create_userns(target_uid=None, target_gid=None):
+    if target_uid is None and target_gid is None:
+        pid = os.fork()
+        rd, wr = os.pipe()
+        if pid == 0:  # child
+            os.close(wr)
+            os.read(rd, 1)
+            apply_id_maps(os.getppid())
+            os._exit(0)
+        else:
+            os.close(rd)
+            unshare(CLONE_NEWUSER)
+            os.close(wr)
+            os.waitpid(pid, 0)
+            return 0, 0
+    elif target_uid is None or target_gid is None:
+        raise RuntimeError('If either of target uid/gid is present both are required')
+
+    uid, gid = os.getuid(), os.getgid()
+
+    unshare(CLONE_NEWUSER)
+    single_id_map('uid', target_uid, uid)
+    single_id_map('gid', target_gid, gid)
+
 
 def mount(device, target, fstype, flags, options):
     if libc.mount(device, target, fstype, flags | MS_MGC_VAL, options) < 0:
@@ -116,7 +134,7 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     if volumes is None:
         volumes = []
 
-    unshare(CLONE_NEWNS|CLONE_NEWIPC|CLONE_NEWUTS|CLONE_NEWPID)
+    unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
     if pid:
         _, ret = os.waitpid(pid, 0)
@@ -137,7 +155,7 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
         bind_mount(volume_source, real_target, rec=True)
 
     target_proc = target_subdir('/proc')
-    mount('proc', target_proc, 'proc', MS_NOEXEC|MS_NODEV|MS_NOSUID, None)
+    mount('proc', target_proc, 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
     for path in ('sysrq-trigger', 'sys', 'irq', 'bus'):
         abs_path = os.path.join(target_proc, path)
         bind_mount(abs_path, abs_path)
@@ -156,7 +174,8 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     unmount_subtree('/mnt')
 
 
-def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash'):
+def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime',
+              entry_point='/bin/bash', target_uid=None, target_gid=None):
     source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
     if not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
@@ -167,14 +186,17 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
     if not os.path.exists(target_dir):
         os.makedirs(target_dir, mode=0o755)
 
-    create_userns()
+    create_userns(target_uid, target_gid)
+
+    if target_uid is None and target_gid is None:
+        target_uid, target_gid = 0, 0
     create_namespaces(source_dir, upper_dir, target_dir, volumes)
     drop_caps()
-    os.seteuid(0)
-    os.setegid(0)
-    os.setuid(0)
-    os.setgid(0)
-    os.setgroups([0])
+    os.seteuid(target_uid)
+    os.setegid(target_gid)
+    os.setuid(target_uid)
+    os.setgid(target_gid)
+    os.setgroups([target_gid])
     os.execv(entry_point, [entry_point])
 
 
@@ -183,10 +205,13 @@ def run_image(image_id, volumes=None, containers_dir='containers', delta_dir='de
 @click.option('--containers-dir', default='containers', help='container image repository')
 @click.option('--delta-dir', default='delta', help='container overlay repository')
 @click.option('--runtime-dir', default='runtime', help='container runtime directory')
+@click.option('--target-uid', '-u', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--target-gid', '-g', help='GID inside container (default: use newgidmap)', type=click.INT)
 @click.argument('image_id')
 @click.argument('entry_point')
-def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime', entry_point='/bin/bash'):
+def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime',
+        entry_point='/bin/bash', target_uid=None, target_gid=None):
     logging.basicConfig(level=logging.INFO)
     if volume:
         volume = [v.split(':', 1) for v in volume]
-    run_image(image_id, volume, containers_dir, delta_dir, runtime_dir, entry_point)
+    run_image(image_id, volume, containers_dir, delta_dir, runtime_dir, entry_point, target_uid, target_gid)
