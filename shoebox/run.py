@@ -12,10 +12,12 @@ def mangle_volume_name(vol):
 
 @click.command()
 @click.argument('container_id')
+@click.argument('command', nargs=-1)
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
+@click.option('--entrypoint', help='override image entrypoint')
 @click.option('--target-uid', '-u', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-g', help='GID inside container (default: use newgidmap)', type=click.INT)
-def run(container_id, shoebox_dir, target_uid=None, target_gid=None):
+def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_gid=None):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('shoebox.build')
 
@@ -38,9 +40,15 @@ def run(container_id, shoebox_dir, target_uid=None, target_gid=None):
             os.makedirs(target, mode=0o755)
         volumes.append((target, vol))
 
-    command = list(metadata.entrypoint or []) + list(metadata.command or [])
+    if entrypoint is None:
+        entrypoint = metadata.entrypoint or []
+    else:
+        entrypoint = [entrypoint]
 
-    bin = '/bin/bash'
-    logger.info('Should execute {0} but executing {1} instead'.format(command, bin))
+    if not command:
+        command = metadata.command or []
+
+    command = list(entrypoint) + list(command)
+
     build_container_namespace(target_base.encode('utf-8'), target_delta.encode('utf-8'), target_root.encode('utf-8'), volumes, target_uid, target_gid)
-    os.execv(bin, [bin])
+    os.execvpe(command[0], command, metadata.context.environ)
