@@ -49,6 +49,8 @@ def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_
         command = metadata.command or []
 
     command = list(entrypoint) + list(command)
+    if not command:
+        command = ['bash']
 
     build_container_namespace(target_base.encode('utf-8'), target_delta.encode('utf-8'), target_root.encode('utf-8'), volumes, target_uid, target_gid)
     os.execvpe(command[0], command, metadata.context.environ)
