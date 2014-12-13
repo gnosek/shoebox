@@ -1,5 +1,6 @@
 from collections import namedtuple
 import json
+import datetime
 
 import re
 import pyparsing as p
@@ -425,7 +426,7 @@ def parse_dockerfile(dockerfile, base_dockerfile=None, repo=None):
 def from_docker_metadata(meta_json):
     config = meta_json['config']
     context = RunContext(
-        environ=config['Env'],
+        environ=dict([kv.split('=', 1) for kv in config['Env']]),
         user=config['User'] or 'root',
         workdir=config['WorkingDir'] or '/')
 
@@ -443,7 +444,7 @@ def from_docker_metadata(meta_json):
         base_image=None,
         base_image_id=config['Image'],
         context=context,
-        run_commands=[],
+        run_commands=[],  # TODO: load from OnBuild
         expose=ports,
         entrypoint=config['Entrypoint'],
         volumes=volumes,
@@ -452,6 +453,59 @@ def from_docker_metadata(meta_json):
     )
     return dockerfile
 
+def to_docker_metadata(container_id, dockerfile):
+    """
+
+    :type dockerfile: Dockerfile
+    """
+    if dockerfile.volumes:
+        volumes = dict((v, {}) for v in sorted(dockerfile.volumes))
+    else:
+        volumes = None
+
+    if dockerfile.expose:
+        ports = dict(('{0}/tcp'.format(p), {}) for p in sorted(dockerfile.expose))
+    else:
+        ports = None
+
+    config = {
+        'Env': ['='.join(kv) for kv in dockerfile.context.environ.items()],
+        'Hostname': 'h' + container_id[:8],
+        'Entrypoint': dockerfile.entrypoint,
+        'PortSpecs': None,
+        'Memory': 0,
+        'OnBuild': [],  # TODO: unparse back to strings
+        'OpenStdin': False,
+        'User': dockerfile.context.user,
+        'AttachStderr': False,
+        'AttachStdout': False,
+        'NetworkDisabled': False,
+        'StdinOnce': False,
+        'Cmd': dockerfile.command,  # container_config differs here
+        'WorkingDir': dockerfile.context.workdir,
+        'AttachStdin': False,
+        'Volumes': volumes,
+        'MemorySwap': 0,
+        'Tty': False,
+        'CpuShares': 0,
+        'Domainname': '',
+        'Image': container_id,  # not really,
+        'SecurityOpt': None,
+        'ExposedPorts': ports,
+    }
+    metadata = {
+        'container': container_id,  # ???
+        'parent': dockerfile.base_image_id,
+        'created': datetime.datetime.now().isoformat(),
+        'os': 'linux',
+        'container_config': config,  # not really but we don't care
+        'architecture': 'amd64',
+        'docker_version': '1.3.0',
+        'config': config,
+        'id': container_id,
+        'Size': 0
+    }
+    return metadata
 
 if __name__ == '__main__':
     example = r'''# some comment

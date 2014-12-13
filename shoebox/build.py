@@ -1,7 +1,8 @@
+import json
 import logging
 import click
 import os
-from shoebox.dockerfile import parse_dockerfile
+from shoebox.dockerfile import parse_dockerfile, to_docker_metadata
 from shoebox.pull import ImageRepository, DEFAULT_INDEX
 
 
@@ -18,12 +19,17 @@ def build(base_dir, shoebox_dir, index_url, force):
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
     storage_dir = os.path.join(shoebox_dir, 'images')
-    runtime_dir = os.path.join(shoebox_dir, 'containers')
-    target_base = os.path.join(runtime_dir, container_id, 'base')
+    runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
+    target_base = os.path.join(runtime_dir, 'base')
+    metadata_file = os.path.join(runtime_dir, 'metadata.json')
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
 
     parsed = parse_dockerfile(open(dockerfile_path).read(), repo=repo)
 
     repo.unpack(target_base, parsed.base_image_id, force)
+    with open(metadata_file, 'w') as fp:
+        json.dump(to_docker_metadata(container_id, parsed), fp, indent=4)
+
+    # TODO: run commands
 
     print container_id
