@@ -131,6 +131,15 @@ def unmount_subtree(tree):
                 libc.umount2(mnt[1], MNT_DETACH)
 
 
+def makedev(target_dir_func, name):
+    target = target_dir_func(name)
+    if not os.path.exists(target):
+        with open(target, 'w') as fp:
+            print >> fp, 'Dummy file to be overmounted by shoebox run'
+    elif True:  # if not device
+        bind_mount(name, target)
+
+
 def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     if volumes is None:
         volumes = []
@@ -158,6 +167,22 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
         if not os.path.exists(real_target):
             os.makedirs(real_target, 0o755)
         bind_mount(volume_source.encode('utf-8'), real_target.encode('utf-8'), rec=True)
+
+    devpts = target_subdir('/dev/pts')
+    ptmx = target_subdir('/dev/ptmx')
+
+    if not os.path.exists(devpts):
+        os.makedirs(devpts, mode=0o755)
+
+    mount('devpts', devpts, 'devpts', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'newinstance')
+    if not os.path.exists(ptmx):
+        os.symlink('pts/ptmx', ptmx)
+    else:
+        bind_mount(os.path.join(devpts, 'ptmx'), ptmx)
+
+    devices = ('null', 'zero', 'tty', 'random', 'urandom')
+    for dev in devices:
+        makedev(target_subdir, '/dev/' + dev)
 
     target_proc = target_subdir('/proc')
     mount('proc', target_proc, 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
