@@ -174,7 +174,7 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     unmount_subtree('/mnt')
 
 
-def run_image(source_dir, delta_dir, runtime_dir, volumes=None, entry_point='/bin/bash', target_uid=None, target_gid=None):
+def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, target_uid=None, target_gid=None):
     if not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
     if not os.path.exists(delta_dir):
@@ -193,7 +193,6 @@ def run_image(source_dir, delta_dir, runtime_dir, volumes=None, entry_point='/bi
     os.setuid(target_uid)
     os.setgid(target_gid)
     os.setgroups([target_gid])
-    os.execv(entry_point, [entry_point])
 
 
 @click.command()
@@ -215,4 +214,5 @@ def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', r
         raise RuntimeError('{0} does not exist'.format(source_dir))
     upper_dir = os.path.join(delta_dir.encode('utf-8'), str(image_id))
     target_dir = os.path.join(runtime_dir.encode('utf-8'), str(image_id))
-    run_image(source_dir, upper_dir, target_dir, volume, entry_point, target_uid, target_gid)
+    build_container_namespace(source_dir, upper_dir, target_dir, volume, target_uid, target_gid)
+    os.execv(entry_point, [entry_point])

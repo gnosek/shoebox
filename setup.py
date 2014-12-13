@@ -14,6 +14,7 @@ setup(
         [console_scripts]
         shoebox-pull=shoebox.pull:pull
         shoebox-build=shoebox.build:build
+        shoebox-run=shoebox.run:run
 
         shoebox-ancestry=shoebox.pull:ancestry
         shoebox-metadata=shoebox.pull:metadata
