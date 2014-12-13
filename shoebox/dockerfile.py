@@ -246,13 +246,7 @@ class ExecCommand(EnvRefCommand):
         try:
             return json.loads(value)
         except ValueError:
-            # docker is beyond stupid in *not* prepending the shell here
-            # we lose the ability to run a command without args and
-            # without passing through the shell
-            # still, keep compatibility
-            return [value]
-
-    pass
+            return ['/bin/sh', '-c', value]
 
 
 class USER_command(EnvRefCommand):
