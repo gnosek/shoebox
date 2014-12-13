@@ -16,6 +16,7 @@ setup(
         shoebox-build=shoebox.build:build
 
         shoebox-ancestry=shoebox.pull:ancestry
+        shoebox-metadata=shoebox.pull:metadata
         shoebox-nsrun=shoebox.namespaces:cli
     ''',
 )

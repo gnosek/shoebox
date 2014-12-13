@@ -143,6 +143,13 @@ class ImageRepository(object):
         target_image_id = tags[tag]
         return list(reversed(self.ancestors(target_image_id)))
 
+    def metadata(self, image, tag='latest'):
+        self.request_access(image)
+
+        tags = self.list_tags(image)
+        target_image_id = tags[tag]
+        return self.image_metadata(target_image_id)
+
 
 @click.command()
 @click.option('--storage-dir', default='~/.shoebox/images', help='image repository')
@@ -167,3 +174,12 @@ def ancestry(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images')
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
     for image_id in repo.ancestry(image, tag):
         print image_id
+
+@click.command()
+@click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
+@click.option('--tag', default='latest', help='tag to pull')
+@click.argument('image')
+def metadata(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images'):
+    logging.basicConfig(level=logging.DEBUG)
+    repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
+    print json.dumps(repo.metadata(image, tag))
