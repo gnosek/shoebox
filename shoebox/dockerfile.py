@@ -4,11 +4,24 @@ import datetime
 
 import re
 import pyparsing as p
+from shoebox.tar import push_tar_file
 
 
 RunContext = namedtuple('RunContext', 'environ user workdir')
-RunCommand = namedtuple('RunCommand', 'command context')
-AddCommand = namedtuple('AddCommand', 'src_paths dst_path is_copy')
+ExecContext = namedtuple('ExecContext', 'base delta root basedir')
+
+class RunCommand(namedtuple('RunCommand', 'command context')):
+    def execute(self, exec_context):
+        raise NotImplementedError()
+
+class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
+    def execute(self, exec_context):
+        push_tar_file(exec_context.base, exec_context.delta, exec_context.root, exec_context.basedir, self.src_paths, self.dst_path)
+
+class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
+    def execute(self, exec_context):
+        raise NotImplementedError()
+
 Dockerfile = namedtuple('Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo')
 
 eol = p.LineEnd().suppress()
@@ -186,7 +199,7 @@ class ADD_command(EnvRefCommand):
             sources = [''.join(v.expand(environ) for v in src) for src in self.sources]
             destination = ''.join(v.expand(environ) for v in self.destination)
             commands = list(context.run_commands)
-            commands.append(AddCommand(sources, destination, False))
+            commands.append(AddCommand(sources, destination))
             context = context._replace(run_commands=commands)
             return context
 
@@ -206,7 +219,7 @@ class COPY_command(EnvRefCommand):
             sources = [''.join(v.expand(environ) for v in src) for src in self.sources]
             destination = ''.join(v.expand(environ) for v in self.destination)
             commands = list(context.run_commands)
-            commands.append(AddCommand(sources, destination, True))
+            commands.append(CopyCommand(sources, destination))
             context = context._replace(run_commands=commands)
             return context
 
