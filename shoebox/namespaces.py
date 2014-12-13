@@ -135,6 +135,10 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     if volumes is None:
         volumes = []
 
+    overlay_lower = overlay_lower.encode('utf-8')
+    overlay_upper = overlay_upper.encode('utf-8')
+    target = target.encode('utf-8')
+
     unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
     if pid:
@@ -153,7 +157,7 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
         real_target = target_subdir(volume_target)
         if not os.path.exists(real_target):
             os.makedirs(real_target, 0o755)
-        bind_mount(volume_source, real_target, rec=True)
+        bind_mount(volume_source.encode('utf-8'), real_target.encode('utf-8'), rec=True)
 
     target_proc = target_subdir('/proc')
     mount('proc', target_proc, 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
@@ -212,10 +216,10 @@ def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', r
     logging.basicConfig(level=logging.INFO)
     if volume:
         volume = [v.split(':', 1) for v in volume]
-    source_dir = os.path.join(containers_dir.encode('utf-8'), str(image_id))
+    source_dir = os.path.join(containers_dir, str(image_id))
     if not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
-    upper_dir = os.path.join(delta_dir.encode('utf-8'), str(image_id))
-    target_dir = os.path.join(runtime_dir.encode('utf-8'), str(image_id))
+    upper_dir = os.path.join(delta_dir, str(image_id))
+    target_dir = os.path.join(runtime_dir, str(image_id))
     build_container_namespace(source_dir, upper_dir, target_dir, volume, target_uid, target_gid)
     os.execv(entry_point, [entry_point])
