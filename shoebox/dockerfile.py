@@ -8,7 +8,7 @@ import pyparsing as p
 RunContext = namedtuple('RunContext', 'environ user workdir')
 RunCommand = namedtuple('RunCommand', 'command context')
 AddCommand = namedtuple('AddCommand', 'src_paths dst_path is_copy')
-Dockerfile = namedtuple('Dockerfile', 'base_image context run_commands expose entrypoint volumes command repo')
+Dockerfile = namedtuple('Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo')
 
 eol = p.LineEnd().suppress()
 sp = p.White().suppress()
@@ -66,12 +66,12 @@ class FROM_command(DockerfileCommand):
 
             :type context: Dockerfile
             """
-            assert context.base_image is None
+            assert context.base_image_id is None
             if context.repo is None:
                 context = context._replace(base_image=(self.image_name, self.tag))
             else:
                 metadata = context.repo.metadata(self.image_name, self.tag)
-                return from_docker_metadata(metadata)
+                context = from_docker_metadata(metadata)
             return context
 
 
@@ -399,6 +399,7 @@ def empty_dockerfile(repo):
         }, user='root', workdir='/')
     base_dockerfile = Dockerfile(
         base_image=None,
+        base_image_id=None,
         context=context,
         run_commands=[],
         expose=[],
@@ -439,7 +440,8 @@ def from_docker_metadata(meta_json):
         volumes = set()
 
     dockerfile = Dockerfile(
-        base_image=config['Image'],
+        base_image=None,
+        base_image_id=config['Image'],
         context=context,
         run_commands=[],
         expose=ports,

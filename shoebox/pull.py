@@ -120,20 +120,15 @@ class ImageRepository(object):
             metadata.append(self.download_metadata(image_id, force=force_download))
         return metadata
 
-    def unpack(self, target_dir, image, tag='latest', force_download=False):
-        self.request_access(image)
-
-        tags = self.list_tags(image)
-        target_image_id = tags[tag]
-
+    def unpack(self, target_dir, image_id, force_download=False):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir, mode=0o755)
 
-        for image_id in reversed(self.ancestors(target_image_id)):
+        for image_id in reversed(self.ancestors(image_id)):
             layer = self.download_image(image_id, force=force_download)
             subprocess.check_call(['tar', 'xf', layer, '-C', target_dir])
 
-        self.logger.info('Unpacked {0}:{1} in {2}'.format(image, tag, target_dir))
+        self.logger.info('Unpacked {0} in {1}'.format(image_id, target_dir))
         return target_dir
 
     def ancestry(self, image, tag='latest'):

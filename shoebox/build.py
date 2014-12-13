@@ -24,7 +24,6 @@ def build(base_dir, shoebox_dir, index_url, force):
 
     parsed = parse_dockerfile(open(dockerfile_path).read(), repo=repo)
 
-    base_image, base_tag = parsed.base_image
-    repo.unpack(target_base, base_image, base_tag, force)
+    repo.unpack(target_base, parsed.base_image_id, force)
 
     print container_id
