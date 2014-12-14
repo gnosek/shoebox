@@ -534,7 +534,7 @@ def inherit_docker_metadata(metadata):
     onbuild = context.onbuild or []
     context = context._replace(base_image_id=metadata['id'], onbuild=[])
     for directive in onbuild:
-        context = directive.evaluate(context)
+        context = directive.command.evaluate(context)
     return context
 
 
