@@ -5,25 +5,14 @@ import datetime
 import re
 import pyparsing as p
 
-from shoebox.tar import CopyFiles
+from shoebox.exec_commands import RunCommand, CopyCommand, AddCommand
 
 
 RunContext = namedtuple('RunContext', 'environ user workdir')
 ExecContext = namedtuple('ExecContext', 'namespace basedir')
 
-class RunCommand(namedtuple('RunCommand', 'command context')):
-    def execute(self, exec_context):
-        raise NotImplementedError()
-
-class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
-    def execute(self, exec_context):
-        CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
-
-class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
-    def execute(self, exec_context):
-        raise NotImplementedError()
-
-Dockerfile = namedtuple('Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo')
+Dockerfile = namedtuple(
+    'Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo')
 
 eol = p.LineEnd().suppress()
 sp = p.White().suppress()
@@ -137,6 +126,7 @@ class EnvRefCommand(DockerfileCommand):
             p.Combine(p.OneOrMore(p.Word(p.printables, excludeChars='\\') | escaped_char))
         ).leaveWhitespace().setParseAction(env_quoted_string)
     )
+
 
 class ENV_command(EnvRefCommand):
     class EnvVariable(Stanza):
@@ -406,7 +396,7 @@ def strip_whitespace_after_continuations(s):
 def empty_dockerfile(repo):
     context = RunContext(environ={
         'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-        }, user='root', workdir='/')
+    }, user='root', workdir='/')
     base_dockerfile = Dockerfile(
         base_image=None,
         base_image_id=None,
@@ -462,6 +452,7 @@ def from_docker_metadata(meta_json):
     )
     return dockerfile
 
+
 def to_docker_metadata(container_id, dockerfile):
     """
 
@@ -515,6 +506,7 @@ def to_docker_metadata(container_id, dockerfile):
         'Size': 0
     }
     return metadata
+
 
 if __name__ == '__main__':
     example = r'''# some comment
