@@ -1,7 +1,50 @@
+import copy
+import logging
 import tarfile
+import operator
+import errno
 import os
 import sys
 from shoebox.namespaces import build_container_namespace
+
+
+logger = logging.getLogger('shoebox.tar')
+
+
+def extract(tar, dest_dir):
+    """Extract files, ignoring permission errors
+
+    Done on one pass instead of extractall loop to support tar streams.
+    Mostly copied from TarFile.extractall()
+    """
+    directories = []
+
+    for tarinfo in tar:
+        if tarinfo.isdir():
+            # Extract directories with a safe mode.
+            directories.append(tarinfo)
+            tarinfo = copy.copy(tarinfo)
+            tarinfo.mode = 0700
+        try:
+            tar.extract(tarinfo, dest_dir)
+        except OSError as exc:
+            if exc.errno == errno.EPERM:
+                logger.warning('Insufficient permissions to extract {0}, skipping'.format(tarinfo.name))
+
+    # Reverse sort directories.
+    directories.sort(key=operator.attrgetter('name'))
+    directories.reverse()
+
+    # Set correct owner, mtime and filemode on directories.
+    for tarinfo in directories:
+        dirpath = os.path.join(dest_dir, tarinfo.name)
+        try:
+            tar.chown(tarinfo, dirpath)
+            tar.utime(tarinfo, dirpath)
+            tar.chmod(tarinfo, dirpath)
+        except tarfile.ExtractError as e:
+            logger.warning('Failed to set permissions/times on {0}: {1}'.format(dirpath, e))
+
 
 
 class TarExtractor(object):
@@ -19,7 +62,7 @@ class TarExtractor(object):
             build_container_namespace(self.base, self.delta, self.root, target_uid=0, target_gid=0)
             # generally insecure but we're enclosed in the target namespace
             # so if things break, don't do that
-            tar.extractall(self.dest_dir)
+            extract(tar, self.dest_dir)
             tar.close()
             exitcode = 0
         except Exception as exc:
