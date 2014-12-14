@@ -6,7 +6,7 @@ import errno
 from shoebox.namespaces import ContainerNamespace
 
 
-logger = logging.getLogger('shoebox.build')
+logger = logging.getLogger('shoebox.rm')
 
 
 def rm_layer(namespace):

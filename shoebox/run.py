@@ -33,7 +33,6 @@ def mangle_volume_name(vol):
 @click.option('--workdir', '-w', help='work directory')
 def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None, target_gid=None, force=False):
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('shoebox.build')
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
 
