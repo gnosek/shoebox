@@ -18,8 +18,8 @@ def mangle_volume_name(vol):
 @click.argument('command', nargs=-1)
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--entrypoint', help='override image entrypoint')
-@click.option('--target-uid', '-u', help='UID inside container (default: use newuidmap)', type=click.INT)
-@click.option('--target-gid', '-g', help='GID inside container (default: use newgidmap)', type=click.INT)
+@click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
 def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_gid=None):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('shoebox.build')

@@ -12,8 +12,8 @@ from shoebox.pull import ImageRepository, DEFAULT_INDEX
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
 @click.option('--force/--no-force', default=False, help='force download')
-@click.option('--target-uid', '-u', help='UID inside container (default: use newuidmap)', type=click.INT)
-@click.option('--target-gid', '-g', help='GID inside container (default: use newgidmap)', type=click.INT)
+@click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
 def build(base_dir, shoebox_dir, index_url, force, target_uid, target_gid):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('shoebox.build')
