@@ -106,6 +106,10 @@ class ExtractTarFile(ExtractTarBase):
         super(ExtractTarFile, self).__init__(namespace, dest_dir)
         self.archive_path = archive_path
 
+    def run(self):
+        logger.info('Extracting {0} to {1} inside container'.format(self.archive_path, self.dest_dir))
+        super(ExtractTarFile, self).run()
+
     def pre_setup(self):
         pass
 
