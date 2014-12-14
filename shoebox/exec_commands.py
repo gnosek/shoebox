@@ -1,6 +1,10 @@
 from collections import namedtuple
 import os
+import logging
 from shoebox.tar import CopyFiles
+
+
+logger = logging.getLogger('shoebox.exec_commands')
 
 
 def get_passwd_id(path, key):
@@ -36,6 +40,7 @@ def exec_in_namespace(context, command):
 
 class RunCommand(namedtuple('RunCommand', 'command context')):
     def execute(self, exec_context):
+        logger.info('RUN {0}'.format(self.command))
         pid = os.fork()
         if pid:
             _, ret = os.waitpid(pid, 0)
@@ -52,10 +57,12 @@ class RunCommand(namedtuple('RunCommand', 'command context')):
 
 class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
+        logger.info('COPY {0} -> {1}'.format(self.src_paths, self.dst_path))
         CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
 
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
+        logger.info('ADD {0} -> {1}'.format(self.src_paths, self.dst_path))
         # TODO: fetch remote URLs, unpack archives (even though it's kind of dumb)
         CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
