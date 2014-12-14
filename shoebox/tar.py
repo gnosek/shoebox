@@ -46,7 +46,7 @@ def extract(tar, dest_dir):
             logger.warning('Failed to set permissions/times on {0}: {1}'.format(dirpath, e))
 
 
-class TarExtractor(object):
+class ExtractTarBase(object):
     def __init__(self, namespace, dest_dir):
         self.namespace = namespace
         self.dest_dir = dest_dir
@@ -99,11 +99,11 @@ class TarExtractor(object):
             self.extract_from_fp(fp)
 
 
-class TarFileExtractor(TarExtractor):
+class ExtractTarFile(ExtractTarBase):
     # TODO: support xz archives via subprocess.Popen piping to tar inside
 
     def __init__(self, namespace, dest_dir, archive_path):
-        super(TarFileExtractor, self).__init__(namespace, dest_dir)
+        super(ExtractTarFile, self).__init__(namespace, dest_dir)
         self.archive_path = archive_path
 
     def pre_setup(self):
@@ -116,9 +116,9 @@ class TarFileExtractor(TarExtractor):
         return open(self.archive_path)
 
 
-class FileCopier(TarExtractor):
+class CopyFiles(ExtractTarBase):
     def __init__(self, namespace, dest_dir, src_dir, members):
-        super(FileCopier, self).__init__(namespace, dest_dir)
+        super(CopyFiles, self).__init__(namespace, dest_dir)
         self.src_dir = src_dir
         self.members = members
         self.rpipe = None
@@ -146,13 +146,3 @@ class FileCopier(TarExtractor):
     def child_setup(self):
         os.close(self.wpipe)
         return os.fdopen(self.rpipe, 'r')
-
-
-def copy_inside(namespace, dest_dir, src_dir, members):
-    fc = FileCopier(namespace, dest_dir, src_dir, members)
-    fc.run()
-
-
-def unpack_inside(namespace, dest_dir, archive_path):
-    tx = TarFileExtractor(namespace, dest_dir, archive_path)
-    tx.run()

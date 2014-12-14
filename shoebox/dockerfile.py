@@ -4,7 +4,8 @@ import datetime
 
 import re
 import pyparsing as p
-from shoebox.tar import copy_inside
+
+from shoebox.tar import CopyFiles
 
 
 RunContext = namedtuple('RunContext', 'environ user workdir')
@@ -16,7 +17,7 @@ class RunCommand(namedtuple('RunCommand', 'command context')):
 
 class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
-        copy_inside(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths)
+        CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
