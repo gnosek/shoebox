@@ -47,6 +47,8 @@ def load_id_map(path, base_id):
     username = getpass.getuser()
     lower_id = 0
     id_ranges = []
+    can_map_self = False
+
     with open(path) as fp:
         for line in fp:
             map_login, id_min, id_count = line.strip().split(':')
@@ -54,7 +56,12 @@ def load_id_map(path, base_id):
                 continue
             id_min = int(id_min)
             id_count = int(id_count)
+            if id_min <= base_id < id_min + id_count:
+                can_map_self = True
             id_ranges.append(((id_min, id_count)))
+
+    if not can_map_self:
+        logger.warning('Cannot map id {0} via {1}, consider adding: "{2}:{0}:1" or similar entry'.format(base_id, path, username))
 
     # arbitrary kernel limit of five entries
     # we're counting from 0
