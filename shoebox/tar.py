@@ -53,7 +53,13 @@ class ExtractTarBase(object):
 
     def extract_from_fp(self, fp):
         # TODO: xz images
-        tar = tarfile.open(fileobj=fp, mode='r|*')
+        try:
+            tar = tarfile.open(fileobj=fp, mode='r|*')
+        except tarfile.ReadError as exc:
+            if exc.message == 'empty file':
+                # oh well, this happens
+                os._exit(0)
+            raise
         exitcode = 1
         try:
             self.namespace.build()
