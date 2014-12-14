@@ -15,6 +15,7 @@ setup(
         shoebox-pull=shoebox.pull:pull
         shoebox-build=shoebox.build:cli
         shoebox-run=shoebox.run:run
+        shoebox-rm=shoebox.rm:cli
 
         shoebox-ancestry=shoebox.pull:ancestry
         shoebox-metadata=shoebox.pull:metadata
