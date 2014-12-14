@@ -15,9 +15,10 @@ def get_groups(path, user):
     groups = set()
     for entry in open(path):
         fields = entry.strip().split(':')
-        members = fields[3].split(',')
-        if user in members:
-            groups.add(int(fields[2]))
+        if len(fields) > 3:
+            members = fields[3].split(',')
+            if user in members:
+                groups.add(int(fields[2]))
     return groups
 
 
