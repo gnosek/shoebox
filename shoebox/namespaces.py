@@ -217,7 +217,7 @@ def pivot_namespace_root(target):
     os.rmdir(pivoted_old_root)
 
 
-def create_namespaces(target, layers, volumes):
+def create_namespaces(target, layers, volumes, special_fs=True):
     unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
     if pid:
@@ -235,13 +235,14 @@ def create_namespaces(target, layers, volumes):
     if volumes:
         mount_volumes(target_subdir, volumes)
 
-    mount_devices(target_subdir)
-    mount_procfs(target_subdir)
-    mount_sysfs(target_subdir)
+    if special_fs:
+        mount_devices(target_subdir)
+        mount_procfs(target_subdir)
+        mount_sysfs(target_subdir)
     pivot_namespace_root(target)
 
 
-def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None, target_gid=None):
+def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None, target_gid=None, special_fs=True):
     if not os.path.exists(runtime_dir):
         if layers:
             os.makedirs(runtime_dir)
@@ -253,7 +254,7 @@ def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None
     if target_uid is None and target_gid is None:
         target_uid, target_gid = 0, 0
 
-    create_namespaces(runtime_dir, layers, volumes)
+    create_namespaces(runtime_dir, layers, volumes, special_fs)
     drop_caps()
     os.seteuid(target_uid)
     os.setegid(target_gid)
