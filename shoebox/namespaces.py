@@ -5,7 +5,6 @@ import logging
 import subprocess
 import tempfile
 
-import click
 import os
 
 from shoebox.capabilities import drop_caps
@@ -233,26 +232,3 @@ def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, 
     os.setuid(target_uid)
     os.setgid(target_gid)
     os.setgroups([target_gid])
-
-
-@click.command()
-@click.option('--volume', '-v', help='mount volume src:dest', multiple=True)
-@click.option('--containers-dir', default='containers', help='container image repository')
-@click.option('--delta-dir', default='delta', help='container overlay repository')
-@click.option('--runtime-dir', default='runtime', help='container runtime directory')
-@click.option('--target-uid', '-u', help='UID inside container (default: use newuidmap)', type=click.INT)
-@click.option('--target-gid', '-g', help='GID inside container (default: use newgidmap)', type=click.INT)
-@click.argument('image_id')
-@click.argument('entry_point')
-def cli(image_id, volume=None, containers_dir='containers', delta_dir='delta', runtime_dir='runtime',
-        entry_point='/bin/bash', target_uid=None, target_gid=None):
-    logging.basicConfig(level=logging.INFO)
-    if volume:
-        volume = [v.split(':', 1) for v in volume]
-    source_dir = os.path.join(containers_dir, str(image_id))
-    if not os.path.exists(source_dir):
-        raise RuntimeError('{0} does not exist'.format(source_dir))
-    upper_dir = os.path.join(delta_dir, str(image_id))
-    target_dir = os.path.join(runtime_dir, str(image_id))
-    build_container_namespace(source_dir, upper_dir, target_dir, volume, target_uid, target_gid)
-    os.execv(entry_point, [entry_point])
