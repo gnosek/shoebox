@@ -20,6 +20,19 @@ def get_groups(path, user):
             groups.add(int(fields[2]))
     return groups
 
+
+def exec_in_namespace(context, command):
+    uid, gid = get_passwd_id('/etc/passwd', context.user)
+    groups = get_groups('/etc/group', context.user)
+    os.setgroups(list(groups))
+    os.setgid(gid)
+    os.setuid(uid)
+    os.setegid(gid)
+    os.seteuid(uid)
+    os.chdir(context.workdir)
+    os.execvpe(command[0], command, context.environ)
+
+
 class RunCommand(namedtuple('RunCommand', 'command context')):
     def execute(self, exec_context):
         pid = os.fork()
@@ -33,15 +46,7 @@ class RunCommand(namedtuple('RunCommand', 'command context')):
                 raise RuntimeError('Command exited with status {0}'.format(exitcode))
         else:
             exec_context.namespace.build()
-            uid, gid = get_passwd_id('/etc/passwd', self.context.user)
-            groups = get_groups('/etc/group', self.context.user)
-            os.setgroups(list(groups))
-            os.setgid(gid)
-            os.setuid(uid)
-            os.setegid(gid)
-            os.seteuid(uid)
-            os.chdir(self.context.workdir)
-            os.execvpe(self.command[0], self.command, self.context.environ)
+            exec_in_namespace(self.context, self.command)
 
 
 class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
