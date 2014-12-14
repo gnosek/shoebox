@@ -86,6 +86,7 @@ class FROM_command(DockerfileCommand):
             else:
                 metadata = context.repo.metadata(self.image_name, self.tag)
                 context = from_docker_metadata(metadata)
+                context = context._replace(base_image_id=metadata['id'])
             return context
 
 
