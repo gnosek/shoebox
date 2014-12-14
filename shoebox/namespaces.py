@@ -60,7 +60,7 @@ def load_id_map(path, base_id):
                 can_map_self = True
             id_ranges.append(((id_min, id_count)))
 
-    if not can_map_self:
+    if id_ranges and not can_map_self:
         logger.warning(
             'Cannot map id {0} via {1}, consider adding: "{2}:{0}:1" or similar entry'.format(base_id, path, username))
 
@@ -71,10 +71,7 @@ def load_id_map(path, base_id):
         lower_id += id_count
 
 
-def apply_id_maps(pid):
-    uid_map = itertools.chain(*load_id_map('/etc/subuid', os.getuid()))
-    gid_map = itertools.chain(*load_id_map('/etc/subgid', os.getgid()))
-
+def apply_id_maps(pid, uid_map, gid_map):
     subprocess.check_call(['newuidmap', str(pid)] + [str(uid) for uid in uid_map])
     subprocess.check_call(['newgidmap', str(pid)] + [str(gid) for gid in gid_map])
 
@@ -85,13 +82,21 @@ def single_id_map(map_name, id_inside, id_outside):
 
 
 def create_userns(target_uid=None, target_gid=None):
+    uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
+    gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
+
+    if not uid_map or not gid_map:
+        logger.warning('No mapping found for current user in /etc/subuid or /etc/subgid, mapping root directly')
+        target_uid = 0
+        target_gid = 0
+
     if target_uid is None and target_gid is None:
         pid = os.fork()
         rd, wr = os.pipe()
         if pid == 0:  # child
             os.close(wr)
             os.read(rd, 1)
-            apply_id_maps(os.getppid())
+            apply_id_maps(os.getppid(), uid_map, gid_map)
             os._exit(0)
         else:
             os.close(rd)
@@ -107,6 +112,7 @@ def create_userns(target_uid=None, target_gid=None):
     unshare(CLONE_NEWUSER)
     single_id_map('uid', target_uid, uid)
     single_id_map('gid', target_gid, gid)
+    return target_uid, target_gid
 
 
 def mount(device, target, fstype, flags, options):
@@ -260,10 +266,7 @@ def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None
         else:
             raise RuntimeError('{0} does not exist'.format(runtime_dir))
 
-    create_userns(target_uid, target_gid)
-
-    if target_uid is None and target_gid is None:
-        target_uid, target_gid = 0, 0
+    target_uid, target_gid = create_userns(target_uid, target_gid)
 
     create_namespaces(runtime_dir, layers, volumes, special_fs)
     drop_caps()
