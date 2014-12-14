@@ -149,6 +149,9 @@ def mount_root_fs(target, overlayfs_layers):
         raise NotImplementedError("Stacked overlayfs not supported (yet)")
 
     if overlayfs_layers:
+        for layer in overlayfs_layers:
+            if not os.path.exists(layer):
+                os.makedirs(layer)
         lower, upper = overlayfs_layers
         lower = lower.encode('utf-8')
         upper = upper.encode('utf-8')
@@ -214,10 +217,7 @@ def pivot_namespace_root(target):
     os.rmdir(pivoted_old_root)
 
 
-def create_namespaces(target, overlay_lower, overlay_upper, volumes):
-    if volumes is None:
-        volumes = []
-
+def create_namespaces(target, layers, volumes):
     unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
     if pid:
@@ -230,11 +230,6 @@ def create_namespaces(target, overlay_lower, overlay_upper, volumes):
 
     def target_subdir(path):
         return os.path.join(target, path.lstrip('/'))
-
-    if overlay_upper is not None and overlay_lower is not None:
-        layers = [overlay_lower, overlay_upper]
-    else:
-        layers = None
 
     mount_root_fs(target, layers)
     if volumes:
@@ -258,7 +253,13 @@ def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, 
 
     if target_uid is None and target_gid is None:
         target_uid, target_gid = 0, 0
-    create_namespaces(runtime_dir, source_dir, delta_dir, volumes)
+
+    if source_dir and delta_dir:
+        layers = [source_dir, delta_dir]
+    else:
+        layers = None
+
+    create_namespaces(runtime_dir, layers, volumes)
     drop_caps()
     os.seteuid(target_uid)
     os.setegid(target_gid)
