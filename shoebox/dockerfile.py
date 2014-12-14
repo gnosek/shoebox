@@ -12,7 +12,7 @@ RunContext = namedtuple('RunContext', 'environ user workdir')
 ExecContext = namedtuple('ExecContext', 'namespace basedir')
 
 Dockerfile = namedtuple(
-    'Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo')
+    'Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo onbuild')
 
 eol = p.LineEnd().suppress()
 sp = p.White().suppress()
@@ -37,6 +37,9 @@ DirectiveValue = p.Combine(
 
 
 class Stanza(object):
+
+    onbuild_allowed = True
+
     def __repr__(self):
         d = dict(self.__dict__)
         if len(d) == 1:
@@ -61,6 +64,9 @@ class DockerfileCommand(object):
 
 class FROM_command(DockerfileCommand):
     class FromCommand(Stanza):
+
+        onbuild_allowed = False
+
         def __init__(self, tokens):
             self.image_name = tokens['image_name']
             self.tag = tokens['tag'][0]
@@ -109,7 +115,7 @@ class EnvRefCommand(DockerfileCommand):
             self.string = tokens[0]
 
         def __str__(self):
-            return self.string
+            return self.string.replace('\\', '\\\\').replace('$', '\\')
 
         # noinspection PyUnusedLocal
         def expand(self, environ):
@@ -307,6 +313,9 @@ class USER_command(EnvRefCommand):
 
 class MAINTAINER_command(EnvRefCommand):
     class Maintainer(Stanza):
+
+        onbuild_allowed = False
+
         def __init__(self, maintainer):
             self.maintainer = maintainer
 
@@ -377,11 +386,21 @@ class ENTRYPOINT_command(ExecCommand):
 
 class ONBUILD_command(DockerfileCommand):
     class OnBuild(Stanza):
+
+        onbuild_allowed = False
+
         def __init__(self, tokens):
             self.command = tokens[0]
+            if not self.command.onbuild_allowed:
+                raise ValueError('Directive {0!s} not allowed in ONBUILD'.format(self.command))
 
         def __str__(self):
             return 'ONBUILD {0}'.format(str(self.command))
+
+        def evaluate(self, context):
+            onbuild = list(context.onbuild)
+            onbuild.append(self.command)
+            return context._replace(onbuild=onbuild)
 
     @classmethod
     def parse(cls, value):
@@ -457,7 +476,8 @@ def empty_dockerfile(repo):
         entrypoint=None,
         volumes=set(),
         command=None,
-        repo=repo
+        repo=repo,
+        onbuild=[],
     )
     return base_dockerfile
 
@@ -490,16 +510,22 @@ def from_docker_metadata(meta_json):
     else:
         volumes = set()
 
+    if config['OnBuild']:
+        onbuild = [ONBUILD_command.parse(v) for v in config['OnBuild']]
+    else:
+        onbuild = []
+
     dockerfile = Dockerfile(
         base_image=None,
         base_image_id=config['Image'],
         context=context,
-        run_commands=[],  # TODO: load from OnBuild
+        run_commands=[],
         expose=ports,
         entrypoint=config['Entrypoint'],
         volumes=volumes,
         command=None,
         repo=None,
+        onbuild=onbuild,
     )
     return dockerfile
 
@@ -519,13 +545,18 @@ def to_docker_metadata(container_id, dockerfile):
     else:
         ports = None
 
+    if dockerfile.onbuild:
+        onbuild = [str(v) for v in dockerfile.onbuild]
+    else:
+        onbuild = []
+
     config = {
         'Env': ['='.join(kv) for kv in dockerfile.context.environ.items()],
         'Hostname': 'h' + container_id[:8],
         'Entrypoint': dockerfile.entrypoint,
         'PortSpecs': None,
         'Memory': 0,
-        'OnBuild': [],  # TODO: unparse back to strings
+        'OnBuild': onbuild,
         'OpenStdin': False,
         'User': dockerfile.context.user,
         'AttachStderr': False,
