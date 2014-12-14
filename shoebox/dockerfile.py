@@ -522,7 +522,7 @@ def from_docker_metadata(meta_json):
         expose=ports,
         entrypoint=config['Entrypoint'],
         volumes=volumes,
-        command=None,
+        command=config['Cmd'],
         repo=None,
         onbuild=onbuild,
     )
