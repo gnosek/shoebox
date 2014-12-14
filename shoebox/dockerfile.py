@@ -84,8 +84,7 @@ class FROM_command(DockerfileCommand):
                 context = context._replace(base_image=(self.image_name, self.tag))
             else:
                 metadata = context.repo.metadata(self.image_name, self.tag)
-                context = from_docker_metadata(metadata)
-                context = context._replace(base_image_id=metadata['id'])
+                context = inherit_docker_metadata(metadata)
             return context
 
 
@@ -528,6 +527,15 @@ def from_docker_metadata(meta_json):
         onbuild=onbuild,
     )
     return dockerfile
+
+
+def inherit_docker_metadata(metadata):
+    context = from_docker_metadata(metadata)
+    onbuild = context.onbuild or []
+    context = context._replace(base_image_id=metadata['id'], onbuild=[])
+    for directive in onbuild:
+        context = directive.evaluate(context)
+    return context
 
 
 def to_docker_metadata(container_id, dockerfile):
