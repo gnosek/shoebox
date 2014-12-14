@@ -165,6 +165,8 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
 
     if overlay_lower is not None and overlay_upper is not None:
         mount('overlayfs', target, 'overlayfs', MS_NOSUID, 'lowerdir={0},upperdir={1}'.format(overlay_lower, overlay_upper))
+    else:
+        bind_mount(target, target)
     for volume_source, volume_target in volumes:
         real_target = target_subdir(volume_target)
         if not os.path.exists(real_target):
@@ -210,11 +212,11 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
 
 
 def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, target_uid=None, target_gid=None):
-    if not os.path.exists(source_dir):
+    if source_dir and not os.path.exists(source_dir):
         raise RuntimeError('{0} does not exist'.format(source_dir))
-    if not os.path.exists(delta_dir):
+    if delta_dir and not os.path.exists(delta_dir):
         os.makedirs(delta_dir, mode=0o755)
-    if not os.path.exists(runtime_dir):
+    if delta_dir and not os.path.exists(runtime_dir):
         os.makedirs(runtime_dir, mode=0o755)
 
     create_userns(target_uid, target_gid)
