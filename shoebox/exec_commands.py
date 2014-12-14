@@ -57,12 +57,18 @@ class RunCommand(namedtuple('RunCommand', 'command context')):
 
 class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
+        if exec_context.basedir is None:
+            logger.warning('Skipping COPY {0} -> {1} -- no base directory'.format(self.src_paths, self.dst_path))
+            return
         logger.info('COPY {0} -> {1}'.format(self.src_paths, self.dst_path))
         CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
 
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
+        if exec_context.basedir is None:
+            logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(self.src_paths, self.dst_path))
+            return
         logger.info('ADD {0} -> {1}'.format(self.src_paths, self.dst_path))
         # TODO: fetch remote URLs, unpack archives (even though it's kind of dumb)
         CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()

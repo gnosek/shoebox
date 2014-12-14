@@ -13,7 +13,7 @@ setup(
     entry_points='''
         [console_scripts]
         shoebox-pull=shoebox.pull:pull
-        shoebox-build=shoebox.build:build
+        shoebox-build=shoebox.build:cli
         shoebox-run=shoebox.run:run
 
         shoebox-ancestry=shoebox.pull:ancestry
