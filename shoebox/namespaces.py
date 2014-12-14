@@ -190,6 +190,9 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
         makedev(target_subdir, '/dev/' + dev)
 
     target_proc = target_subdir('/proc')
+    if not os.path.exists(target_proc):
+        os.makedirs(target_proc, mode=0o755)
+
     mount('proc', target_proc, 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
     for path in ('sysrq-trigger', 'sys', 'irq', 'bus'):
         abs_path = os.path.join(target_proc, path)
