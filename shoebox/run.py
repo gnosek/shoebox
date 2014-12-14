@@ -51,5 +51,5 @@ def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_
     if not command:
         command = ['bash']
 
-    build_container_namespace(target_base, target_delta, target_root, volumes, target_uid, target_gid)
+    build_container_namespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
     os.execvpe(command[0], command, metadata.context.environ)

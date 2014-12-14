@@ -3,8 +3,10 @@ import logging
 import tarfile
 import operator
 import errno
-import os
 import sys
+
+import os
+
 from shoebox.namespaces import build_container_namespace
 
 
@@ -46,12 +48,10 @@ def extract(tar, dest_dir):
             logger.warning('Failed to set permissions/times on {0}: {1}'.format(dirpath, e))
 
 
-
 class TarExtractor(object):
-    def __init__(self, base, delta, root, dest_dir):
-        self.base = base
-        self.delta = delta
+    def __init__(self, root, layers, dest_dir):
         self.root = root
+        self.layers = layers
         self.dest_dir = dest_dir
 
     def extract_from_fp(self, fp):
@@ -59,7 +59,7 @@ class TarExtractor(object):
         tar = tarfile.open(fileobj=fp, mode='r|*')
         exitcode = 1
         try:
-            build_container_namespace(self.base, self.delta, self.root, target_uid=0, target_gid=0)
+            build_container_namespace(self.root, self.layers, target_uid=0, target_gid=0)
             # generally insecure but we're enclosed in the target namespace
             # so if things break, don't do that
             extract(tar, self.dest_dir)
@@ -105,8 +105,8 @@ class TarExtractor(object):
 class TarFileExtractor(TarExtractor):
     # TODO: support xz archives via subprocess.Popen piping to tar inside
 
-    def __init__(self, base, delta, root, dest_dir, archive_path):
-        super(TarFileExtractor, self).__init__(base, delta, root, dest_dir)
+    def __init__(self, root, layers, dest_dir, archive_path):
+        super(TarFileExtractor, self).__init__(root, layers, dest_dir)
         self.archive_path = archive_path
 
     def pre_setup(self):
@@ -120,9 +120,8 @@ class TarFileExtractor(TarExtractor):
 
 
 class FileCopier(TarExtractor):
-
-    def __init__(self, base, delta, root, dest_dir, src_dir, members):
-        super(FileCopier, self).__init__(base, delta, root, dest_dir)
+    def __init__(self, root, layers, dest_dir, src_dir, members):
+        super(FileCopier, self).__init__(root, layers, dest_dir)
         self.src_dir = src_dir
         self.members = members
         self.rpipe = None
@@ -152,10 +151,11 @@ class FileCopier(TarExtractor):
         return os.fdopen(self.rpipe, 'r')
 
 
-def copy_inside(base, delta, root, src_dir, members, dest_dir):
-    fc = FileCopier(base, delta, root, dest_dir, src_dir, members)
+def copy_inside(root, layers, dest_dir, src_dir, members):
+    fc = FileCopier(root, layers, dest_dir, src_dir, members)
     fc.run()
 
-def unpack_inside(base, delta, root, archive_path, dest_dir):
-    tx = TarFileExtractor(base, delta, root, dest_dir, archive_path)
+
+def unpack_inside(root, layers, dest_dir, archive_path):
+    tx = TarFileExtractor(root, layers, dest_dir, archive_path)
     tx.run()

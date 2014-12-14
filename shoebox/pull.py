@@ -126,7 +126,7 @@ class ImageRepository(object):
 
         for image_id in reversed(self.ancestors(image_id)):
             layer = self.download_image(image_id, force=force_download)
-            tar.unpack_inside(None, None, target_dir, layer, '/')
+            tar.unpack_inside(target_dir, None, '/', layer)
 
         self.logger.info('Unpacked {0} in {1}'.format(image_id, target_dir))
         return target_dir

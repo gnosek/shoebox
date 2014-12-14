@@ -241,23 +241,17 @@ def create_namespaces(target, layers, volumes):
     pivot_namespace_root(target)
 
 
-def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, target_uid=None, target_gid=None):
-    if source_dir and not os.path.exists(source_dir):
-        raise RuntimeError('{0} does not exist'.format(source_dir))
-    if delta_dir and not os.path.exists(delta_dir):
-        os.makedirs(delta_dir, mode=0o755)
-    if delta_dir and not os.path.exists(runtime_dir):
-        os.makedirs(runtime_dir, mode=0o755)
+def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None, target_gid=None):
+    if not os.path.exists(runtime_dir):
+        if layers:
+            os.makedirs(runtime_dir)
+        else:
+            raise RuntimeError('{0} does not exist'.format(runtime_dir))
 
     create_userns(target_uid, target_gid)
 
     if target_uid is None and target_gid is None:
         target_uid, target_gid = 0, 0
-
-    if source_dir and delta_dir:
-        layers = [source_dir, delta_dir]
-    else:
-        layers = None
 
     create_namespaces(runtime_dir, layers, volumes)
     drop_caps()
