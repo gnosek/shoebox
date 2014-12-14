@@ -65,6 +65,9 @@ class FROM_command(DockerfileCommand):
             self.image_name = tokens['image_name']
             self.tag = tokens['tag'][0]
 
+        def __str__(self):
+            return 'FROM {0}:{1}'.format(self.image_name, self.tag)
+
         def evaluate(self, context):
             """
 
@@ -95,12 +98,18 @@ class EnvRefCommand(DockerfileCommand):
         def __init__(self, tokens):
             self.reference = tokens['ref']
 
+        def __str__(self):
+            return '${' + self.reference + '}'
+
         def expand(self, environ):
             return environ[self.reference]
 
     class EnvStaticString(Stanza):
         def __init__(self, tokens):
             self.string = tokens[0]
+
+        def __str__(self):
+            return self.string
 
         # noinspection PyUnusedLocal
         def expand(self, environ):
@@ -134,6 +143,9 @@ class ENV_command(EnvRefCommand):
             self.name = tokens['name']
             self.value = list(tokens['value'])
 
+        def __str__(self):
+            return 'ENV {0} {1}'.format(self.name, ''.join(str(v) for v in self.value))
+
         def evaluate(self, context):
             environ = dict(context.context.environ)
             environ[self.name] = ''.join(v.expand(environ) for v in self.value)
@@ -155,6 +167,9 @@ class WORKDIR_command(EnvRefCommand):
         def __init__(self, tokens):
             self.workdir = tokens['workdir']
 
+        def __str__(self):
+            return 'WORKDIR {0}'.format(''.join(str(v) for v in self.workdir))
+
         def evaluate(self, context):
             environ = context.context.environ
             workdir = ''.join(v.expand(environ) for v in self.workdir)
@@ -168,6 +183,9 @@ class EXPOSE_command(EnvRefCommand):
     class ExposePort(Stanza):
         def __init__(self, tokens):
             self.port = tokens['port']
+
+        def __str__(self):
+            return 'EXPOSE {0}'.format(''.join(str(v) for v in self.port))
 
         def evaluate(self, context):
             environ = context.context.environ
@@ -185,6 +203,9 @@ class ADD_command(EnvRefCommand):
             path_list = tokens['path_list'].asList()
             self.sources = path_list[:-1]
             self.destination = path_list[-1]
+
+        def __str__(self):
+            return 'ADD {0} {1}'.format(' '.join([''.join(str(v) for v in src) for src in self.sources]), ''.join(str(v) for v in self.destination))
 
         def evaluate(self, context):
             environ = context.context.environ
@@ -206,6 +227,9 @@ class COPY_command(EnvRefCommand):
             self.sources = path_list[:-1]
             self.destination = path_list[-1]
 
+        def __str__(self):
+            return 'COPY {0} {1}'.format(' '.join([''.join(str(v) for v in src) for src in self.sources]), ''.join(str(v) for v in self.destination))
+
         def evaluate(self, context):
             environ = context.context.environ
             sources = [''.join(v.expand(environ) for v in src) for src in self.sources]
@@ -223,6 +247,9 @@ class VOLUME_command(EnvRefCommand):
     class Volume(Stanza):
         def __init__(self, tokens):
             self.path = tokens['path']
+
+        def __str__(self):
+            return 'VOLUME {0}'.format(''.join(str(v) for v in self.path))
 
         def evaluate(self, context):
             environ = context.context.environ
@@ -254,10 +281,19 @@ class ExecCommand(EnvRefCommand):
             return ['/bin/sh', '-c', value]
 
 
+def format_exec_command(keyword, value):
+    if value[:2] == ['/bin/sh', '-c'] and len(value) == 3:
+        return '{0} {1}'.format(keyword, value[2])
+    return '{0} {1}'.format(keyword, json.dumps(value))
+
+
 class USER_command(EnvRefCommand):
     class User(Stanza):
         def __init__(self, tokens):
             self.name = tokens['name']
+
+        def __str__(self):
+            return 'USER {0}'.format(''.join(str(v) for v in self.name))
 
         def evaluate(self, context):
             environ = context.context.environ
@@ -273,6 +309,9 @@ class MAINTAINER_command(EnvRefCommand):
     class Maintainer(Stanza):
         def __init__(self, maintainer):
             self.maintainer = maintainer
+
+        def __str__(self):
+            return 'MAINTAINER {0}'.format(self.maintainer)
 
     @classmethod
     def parse(cls, value):
@@ -290,6 +329,9 @@ class RUN_command(ExecCommand):
         def __init__(self, command):
             self.command = command
 
+        def __str__(self):
+            return format_exec_command('RUN', self.command)
+
         def evaluate(self, context):
             commands = list(context.run_commands)
             commands.append(RunCommand(self.command, context.context))
@@ -306,6 +348,9 @@ class CMD_command(ExecCommand):
         def __init__(self, command):
             self.command = command
 
+        def __str__(self):
+            return format_exec_command('CMD', self.command)
+
         def evaluate(self, context):
             return context._replace(command=self.command)
 
@@ -319,6 +364,9 @@ class ENTRYPOINT_command(ExecCommand):
         def __init__(self, command):
             self.command = command
 
+        def __str__(self):
+            return format_exec_command('ENTRYPOINT', self.command)
+
         def evaluate(self, context):
             return context._replace(entrypoint=self.command)
 
@@ -330,7 +378,10 @@ class ENTRYPOINT_command(ExecCommand):
 class ONBUILD_command(DockerfileCommand):
     class OnBuild(Stanza):
         def __init__(self, tokens):
-            self.command = tokens
+            self.command = tokens[0]
+
+        def __str__(self):
+            return 'ONBUILD {0}'.format(str(self.command))
 
     @classmethod
     def parse(cls, value):
