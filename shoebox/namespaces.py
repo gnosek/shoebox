@@ -135,19 +135,88 @@ def makedev(target_dir_func, name):
     if not os.path.exists(target):
         with open(target, 'w') as fp:
             print >> fp, 'Dummy file to be overmounted by shoebox run'
-    elif True:  # if not device
-        bind_mount(name, target)
+    elif True:  # TODO: if not device
+        bind_mount(name.encode('utf-8'), target.encode('utf-8'))
 
 
-def create_namespaces(overlay_lower, overlay_upper, target, volumes):
+def mount_root_fs(target, overlayfs_layers):
+    target = target.encode('utf-8')
+
+    if overlayfs_layers is None:
+        overlayfs_layers = []
+
+    if overlayfs_layers and len(overlayfs_layers) != 2:
+        raise NotImplementedError("Stacked overlayfs not supported (yet)")
+
+    if overlayfs_layers:
+        lower, upper = overlayfs_layers
+        lower = lower.encode('utf-8')
+        upper = upper.encode('utf-8')
+        mount('overlayfs', target, 'overlayfs', 0, 'lowerdir={0},upperdir={1}'.format(lower, upper))
+    else:
+        # make target a mount point, for pivot_root
+        bind_mount(target, target)
+
+
+def mount_volumes(target_dir_func, volumes):
+    for volume_source, volume_target in volumes:
+        real_target = target_dir_func(volume_target)
+        if not os.path.exists(real_target):
+            os.makedirs(real_target, 0o755)
+        bind_mount(volume_source.encode('utf-8'), real_target.encode('utf-8'), rec=True)
+
+
+def mount_devices(target_dir_func):
+    devpts = target_dir_func('/dev/pts')
+    ptmx = target_dir_func('/dev/ptmx')
+
+    if not os.path.exists(devpts):
+        os.makedirs(devpts, mode=0o755)
+
+    mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'newinstance')
+    if not os.path.exists(ptmx):
+        os.symlink('pts/ptmx', ptmx)
+    else:
+        bind_mount(os.path.join(devpts, 'ptmx').encode('utf-8'), ptmx.encode('utf-8'))
+
+    devices = ('null', 'zero', 'tty', 'random', 'urandom')
+    for dev in devices:
+        makedev(target_dir_func, '/dev/' + dev)
+
+
+def mount_procfs(target_dir_func):
+    target_proc = target_dir_func('/proc')
+    if not os.path.exists(target_proc):
+        os.makedirs(target_proc, mode=0o755)
+    mount('proc', target_proc.encode('utf-8'), 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
+    for path in ('sysrq-trigger', 'sys', 'irq', 'bus'):
+        abs_path = os.path.join(target_proc, path).encode('utf-8')
+        bind_mount(abs_path, abs_path)
+        bind_mount(abs_path, abs_path, readonly=True)
+
+
+def mount_sysfs(target_dir_func):
+    target_sys = target_dir_func('/sys').encode('utf-8')
+    try:
+        bind_mount('/sys', target_sys)
+        bind_mount(target_sys, target_sys, readonly=True)
+    except OSError:
+        logger.debug('Failed to mount sysfs, probably not owned by us')
+
+
+def pivot_namespace_root(target):
+    target = target.encode('utf-8')
+    old_root = tempfile.mkdtemp(prefix='.oldroot', dir=target)
+    pivot_root(target, old_root)
+    os.chdir('/')
+    pivoted_old_root = '/' + os.path.basename(old_root)
+    unmount_subtree(pivoted_old_root)
+    os.rmdir(pivoted_old_root)
+
+
+def create_namespaces(target, overlay_lower, overlay_upper, volumes):
     if volumes is None:
         volumes = []
-
-    if overlay_lower is not None:
-        overlay_lower = overlay_lower.encode('utf-8')
-    if overlay_upper is not None:
-        overlay_upper = overlay_upper.encode('utf-8')
-    target = target.encode('utf-8')
 
     unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
@@ -162,55 +231,19 @@ def create_namespaces(overlay_lower, overlay_upper, target, volumes):
     def target_subdir(path):
         return os.path.join(target, path.lstrip('/'))
 
-    if overlay_lower is not None and overlay_upper is not None:
-        mount('overlayfs', target, 'overlayfs', MS_NOSUID, 'lowerdir={0},upperdir={1}'.format(overlay_lower, overlay_upper))
+    if overlay_upper is not None and overlay_lower is not None:
+        layers = [overlay_lower, overlay_upper]
     else:
-        bind_mount(target, target)
-    for volume_source, volume_target in volumes:
-        real_target = target_subdir(volume_target)
-        if not os.path.exists(real_target):
-            os.makedirs(real_target, 0o755)
-        bind_mount(volume_source.encode('utf-8'), real_target.encode('utf-8'), rec=True)
+        layers = None
 
-    devpts = target_subdir('/dev/pts')
-    ptmx = target_subdir('/dev/ptmx')
+    mount_root_fs(target, layers)
+    if volumes:
+        mount_volumes(target_subdir, volumes)
 
-    if not os.path.exists(devpts):
-        os.makedirs(devpts, mode=0o755)
-
-    mount('devpts', devpts, 'devpts', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'newinstance')
-    if not os.path.exists(ptmx):
-        os.symlink('pts/ptmx', ptmx)
-    else:
-        bind_mount(os.path.join(devpts, 'ptmx'), ptmx)
-
-    devices = ('null', 'zero', 'tty', 'random', 'urandom')
-    for dev in devices:
-        makedev(target_subdir, '/dev/' + dev)
-
-    target_proc = target_subdir('/proc')
-    if not os.path.exists(target_proc):
-        os.makedirs(target_proc, mode=0o755)
-
-    mount('proc', target_proc, 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
-    for path in ('sysrq-trigger', 'sys', 'irq', 'bus'):
-        abs_path = os.path.join(target_proc, path)
-        bind_mount(abs_path, abs_path)
-        bind_mount(abs_path, abs_path, readonly=True)
-
-    target_sys = target_subdir('/sys')
-    try:
-        bind_mount('/sys', target_sys)
-        bind_mount(target_sys, target_sys, readonly=True)
-    except OSError:
-        logger.debug('Failed to mount sysfs, probably not owned by us')
-
-    old_root = tempfile.mkdtemp(prefix='.oldroot', dir=target)
-    pivot_root(target, old_root)
-    os.chdir('/')
-    pivoted_old_root = '/' + os.path.basename(old_root)
-    unmount_subtree(pivoted_old_root)
-    os.rmdir(pivoted_old_root)
+    mount_devices(target_subdir)
+    mount_procfs(target_subdir)
+    mount_sysfs(target_subdir)
+    pivot_namespace_root(target)
 
 
 def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, target_uid=None, target_gid=None):
@@ -225,7 +258,7 @@ def build_container_namespace(source_dir, delta_dir, runtime_dir, volumes=None, 
 
     if target_uid is None and target_gid is None:
         target_uid, target_gid = 0, 0
-    create_namespaces(source_dir, delta_dir, runtime_dir, volumes)
+    create_namespaces(runtime_dir, source_dir, delta_dir, volumes)
     drop_caps()
     os.seteuid(target_uid)
     os.setegid(target_gid)
