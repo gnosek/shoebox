@@ -509,10 +509,10 @@ def from_docker_metadata(meta_json):
     else:
         volumes = set()
 
+    onbuild = []
     if config['OnBuild']:
-        onbuild = [ONBUILD_command.parse(v) for v in config['OnBuild']]
-    else:
-        onbuild = []
+        for v in config['OnBuild']:
+            onbuild.extend(ONBUILD_command.parse(v))
 
     dockerfile = Dockerfile(
         base_image=None,
