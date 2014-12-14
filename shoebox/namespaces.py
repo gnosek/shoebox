@@ -96,8 +96,12 @@ def create_userns(target_uid=None, target_gid=None):
         if pid == 0:  # child
             os.close(wr)
             os.read(rd, 1)
-            apply_id_maps(os.getppid(), uid_map, gid_map)
-            os._exit(0)
+            exitcode = 1
+            try:
+                apply_id_maps(os.getppid(), uid_map, gid_map)
+                exitcode = 0
+            finally:
+                os._exit(exitcode)
         else:
             os.close(rd)
             unshare(CLONE_NEWUSER)
