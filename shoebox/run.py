@@ -20,7 +20,9 @@ def mangle_volume_name(vol):
 @click.option('--entrypoint', help='override image entrypoint')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
-def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_gid=None):
+@click.option('--user', '-u', help='user to run as')
+@click.option('--workdir', '-w', help='work directory')
+def run(container_id, shoebox_dir, command, entrypoint, user=None, workdir=None, target_uid=None, target_gid=None):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('shoebox.build')
 
@@ -54,6 +56,12 @@ def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_
     if not command:
         command = ['bash']
 
+    context = metadata.context
+    if user:
+        context = context._replace(user=user)
+    if workdir:
+        context = context._replace(workdir=workdir)
+
     namespace = ContainerNamespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
     namespace.build()
-    exec_in_namespace(metadata.context, command)
+    exec_in_namespace(context, command)
