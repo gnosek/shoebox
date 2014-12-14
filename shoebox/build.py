@@ -3,6 +3,7 @@ import logging
 import click
 import os
 from shoebox.dockerfile import parse_dockerfile, to_docker_metadata, ExecContext
+from shoebox.namespaces import ContainerNamespace
 from shoebox.pull import ImageRepository, DEFAULT_INDEX
 
 
@@ -11,7 +12,9 @@ from shoebox.pull import ImageRepository, DEFAULT_INDEX
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
 @click.option('--force/--no-force', default=False, help='force download')
-def build(base_dir, shoebox_dir, index_url, force):
+@click.option('--target-uid', '-u', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--target-gid', '-g', help='GID inside container (default: use newgidmap)', type=click.INT)
+def build(base_dir, shoebox_dir, index_url, force, target_uid, target_gid):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('shoebox.build')
     container_id = os.urandom(32).encode('hex')
@@ -33,9 +36,13 @@ def build(base_dir, shoebox_dir, index_url, force):
         json.dump(to_docker_metadata(container_id, parsed), fp, indent=4)
 
     exec_context = ExecContext(
-        base=target_base,
-        delta=target_delta,
-        root=target_root,
+        namespace=ContainerNamespace(
+            target=target_root,
+            layers=[target_base, target_delta],
+            target_uid=target_uid,
+            target_gid=target_gid,
+            special_fs=False,
+        ),
         basedir=base_dir
     )
     for cmd in parsed.run_commands:

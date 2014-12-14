@@ -8,7 +8,7 @@ from shoebox.tar import copy_inside
 
 
 RunContext = namedtuple('RunContext', 'environ user workdir')
-ExecContext = namedtuple('ExecContext', 'base delta root basedir')
+ExecContext = namedtuple('ExecContext', 'namespace basedir')
 
 class RunCommand(namedtuple('RunCommand', 'command context')):
     def execute(self, exec_context):
@@ -16,8 +16,7 @@ class RunCommand(namedtuple('RunCommand', 'command context')):
 
 class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
-        copy_inside(exec_context.root, [exec_context.base, exec_context.delta], self.dst_path, exec_context.basedir,
-                    self.src_paths)
+        copy_inside(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths)
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):

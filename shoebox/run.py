@@ -1,9 +1,11 @@
 import json
 import logging
+
 import click
 import os
+
 from shoebox.dockerfile import from_docker_metadata
-from shoebox.namespaces import build_container_namespace
+from shoebox.namespaces import ContainerNamespace
 
 
 def mangle_volume_name(vol):
@@ -51,5 +53,6 @@ def run(container_id, shoebox_dir, command, entrypoint, target_uid=None, target_
     if not command:
         command = ['bash']
 
-    build_container_namespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
+    namespace = ContainerNamespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
+    namespace.build()
     os.execvpe(command[0], command, metadata.context.environ)

@@ -7,8 +7,6 @@ import sys
 
 import os
 
-from shoebox.namespaces import build_container_namespace
-
 
 logger = logging.getLogger('shoebox.tar')
 
@@ -49,9 +47,8 @@ def extract(tar, dest_dir):
 
 
 class TarExtractor(object):
-    def __init__(self, root, layers, dest_dir):
-        self.root = root
-        self.layers = layers
+    def __init__(self, namespace, dest_dir):
+        self.namespace = namespace
         self.dest_dir = dest_dir
 
     def extract_from_fp(self, fp):
@@ -59,7 +56,7 @@ class TarExtractor(object):
         tar = tarfile.open(fileobj=fp, mode='r|*')
         exitcode = 1
         try:
-            build_container_namespace(self.root, self.layers, target_uid=0, target_gid=0)
+            self.namespace.build()
             # generally insecure but we're enclosed in the target namespace
             # so if things break, don't do that
             extract(tar, self.dest_dir)
@@ -105,8 +102,8 @@ class TarExtractor(object):
 class TarFileExtractor(TarExtractor):
     # TODO: support xz archives via subprocess.Popen piping to tar inside
 
-    def __init__(self, root, layers, dest_dir, archive_path):
-        super(TarFileExtractor, self).__init__(root, layers, dest_dir)
+    def __init__(self, namespace, dest_dir, archive_path):
+        super(TarFileExtractor, self).__init__(namespace, dest_dir)
         self.archive_path = archive_path
 
     def pre_setup(self):
@@ -120,8 +117,8 @@ class TarFileExtractor(TarExtractor):
 
 
 class FileCopier(TarExtractor):
-    def __init__(self, root, layers, dest_dir, src_dir, members):
-        super(FileCopier, self).__init__(root, layers, dest_dir)
+    def __init__(self, namespace, dest_dir, src_dir, members):
+        super(FileCopier, self).__init__(namespace, dest_dir)
         self.src_dir = src_dir
         self.members = members
         self.rpipe = None
@@ -151,11 +148,11 @@ class FileCopier(TarExtractor):
         return os.fdopen(self.rpipe, 'r')
 
 
-def copy_inside(root, layers, dest_dir, src_dir, members):
-    fc = FileCopier(root, layers, dest_dir, src_dir, members)
+def copy_inside(namespace, dest_dir, src_dir, members):
+    fc = FileCopier(namespace, dest_dir, src_dir, members)
     fc.run()
 
 
-def unpack_inside(root, layers, dest_dir, archive_path):
-    tx = TarFileExtractor(root, layers, dest_dir, archive_path)
+def unpack_inside(namespace, dest_dir, archive_path):
+    tx = TarFileExtractor(namespace, dest_dir, archive_path)
     tx.run()

@@ -61,7 +61,8 @@ def load_id_map(path, base_id):
             id_ranges.append(((id_min, id_count)))
 
     if not can_map_self:
-        logger.warning('Cannot map id {0} via {1}, consider adding: "{2}:{0}:1" or similar entry'.format(base_id, path, username))
+        logger.warning(
+            'Cannot map id {0} via {1}, consider adding: "{2}:{0}:1" or similar entry'.format(base_id, path, username))
 
     # arbitrary kernel limit of five entries
     # we're counting from 0
@@ -268,3 +269,17 @@ def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None
     os.setuid(target_uid)
     os.setgid(target_gid)
     os.setgroups([target_gid])
+
+
+class ContainerNamespace(object):
+    def __init__(self, target, layers, volumes=None, target_uid=None, target_gid=None, special_fs=True):
+        self.target = target
+        self.layers = layers
+        self.volumes = volumes
+        self.target_uid = target_uid
+        self.target_gid = target_gid
+        self.special_fs = special_fs
+
+    def build(self):
+        build_container_namespace(
+            self.target, self.layers, self.volumes, self.target_uid, self.target_gid, self.special_fs)
