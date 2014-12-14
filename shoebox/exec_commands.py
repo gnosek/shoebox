@@ -57,4 +57,5 @@ class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
-        raise NotImplementedError()
+        # TODO: fetch remote URLs, unpack archives (even though it's kind of dumb)
+        CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
