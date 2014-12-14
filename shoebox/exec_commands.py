@@ -11,6 +11,15 @@ def get_passwd_id(path, key):
     raise KeyError('{0} not found in {1}'.format(key, path))
 
 
+def get_groups(path, user):
+    groups = set()
+    for entry in open(path):
+        fields = entry.strip().split(':')
+        members = fields[3].split(',')
+        if user in members:
+            groups.add(int(fields[2]))
+    return groups
+
 class RunCommand(namedtuple('RunCommand', 'command context')):
     def execute(self, exec_context):
         pid = os.fork()
@@ -25,8 +34,8 @@ class RunCommand(namedtuple('RunCommand', 'command context')):
         else:
             exec_context.namespace.build()
             uid, gid = get_passwd_id('/etc/passwd', self.context.user)
-            # TODO: initgroups from /etc/group
-            os.setgroups([gid])
+            groups = get_groups('/etc/group', self.context.user)
+            os.setgroups(list(groups))
             os.setgid(gid)
             os.setuid(uid)
             os.setegid(gid)
