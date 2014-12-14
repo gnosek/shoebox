@@ -4,12 +4,13 @@ import logging
 import click
 import os
 import re
-from shoebox.build import build
 
+from shoebox.build import build
 from shoebox.dockerfile import from_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
 from shoebox.namespaces import ContainerNamespace
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
+from shoebox.rm import remove_container
 
 
 def is_container_id(container_id):
@@ -31,7 +32,9 @@ def mangle_volume_name(vol):
 @click.option('--force/--no-force', default=False, help='force download')
 @click.option('--user', '-u', help='user to run as')
 @click.option('--workdir', '-w', help='work directory')
-def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None, target_gid=None, force=False):
+@click.option('--rm/--no-rm', help='remove container after exit')
+def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None,
+        target_gid=None, force=False, rm=False):
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
@@ -87,5 +90,18 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         context = context._replace(workdir=workdir)
 
     namespace = ContainerNamespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
+
+    if rm:
+        pid = os.fork()
+        if pid:
+            _, ret = os.waitpid(pid, 0)
+            exitcode = ret >> 8
+            exitsig = ret & 0x7f
+            if exitsig:
+                exitcode = exitsig + 128
+
+            remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
+            os._exit(exitcode)
+
     namespace.build()
     exec_in_namespace(context, command)

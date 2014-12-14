@@ -29,7 +29,7 @@ def rm_layer(namespace):
             os._exit(exitcode)
 
 
-def rm(shoebox_dir, container_id, volumes=False, target_uid=None, target_gid=None):
+def remove_container(shoebox_dir, container_id, volumes=False, target_uid=None, target_gid=None):
     runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
     target_base = os.path.join(runtime_dir, 'base')
     target_delta = os.path.join(runtime_dir, 'delta')
@@ -73,4 +73,4 @@ def cli(container_id, shoebox_dir, target_uid=None, target_gid=None, volumes=Fal
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
-    rm(shoebox_dir, container_id, volumes, target_uid, target_gid)
+    remove_container(shoebox_dir, container_id, volumes, target_uid, target_gid)
