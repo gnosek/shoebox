@@ -6,7 +6,7 @@ import os
 import re
 
 from shoebox.build import build
-from shoebox.dockerfile import from_docker_metadata
+from shoebox.dockerfile import from_docker_metadata, inherit_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
 from shoebox.namespaces import ContainerNamespace
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
@@ -54,7 +54,9 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
             image_id, tag = container_id.split(':', 1)
         except ValueError:
             image_id, tag = container_id, 'latest'
-        metadata = from_docker_metadata(repo.metadata(image_id, tag))
+        metadata = repo.metadata(image_id, tag)
+        metadata = inherit_docker_metadata(metadata)
+        metadata = metadata._replace(run_commands=[])
         container_id = build(None, force, metadata, repo, shoebox_dir, target_gid, target_uid)
         runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
         target_base = os.path.join(runtime_dir, 'base')
