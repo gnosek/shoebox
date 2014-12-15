@@ -5,6 +5,7 @@ import operator
 import errno
 
 import os
+from shoebox.namespaces import ContainerNamespace
 
 
 logger = logging.getLogger('shoebox.tar')
@@ -144,19 +145,17 @@ class CopyFiles(ExtractTarBase):
 
     def parent_setup(self):
         os.close(self.rpipe)
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(self.src_dir)
-            archive = os.fdopen(self.wpipe, 'w')
-            tar = ContainerTarFile.open(fileobj=archive, mode='w|')
+        archive = os.fdopen(self.wpipe, 'w')
+        tar = ContainerTarFile.open(fileobj=archive, mode='w|')
+        def tar_add():
             for m in self.members:
-                # TODO: check absolute paths not stepping outside src_dir
-                # maybe enclose in a namespace itself
                 tar.add(m)
             tar.close()
             archive.close()
-        finally:
-            os.chdir(old_cwd)
+        src_namespace = ContainerNamespace(
+            self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid, special_fs=False)
+        src_namespace.run(tar_add)
+        archive.close()
 
     def child_setup(self):
         os.close(self.wpipe)
