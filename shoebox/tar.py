@@ -149,7 +149,10 @@ class CopyFiles(ExtractTarBase):
         tar = ContainerTarFile.open(fileobj=archive, mode='w|')
         def tar_add():
             for m in self.members:
-                tar.add(m)
+                if os.path.isdir(m):
+                    tar.add(m, arcname='.')
+                else:
+                    tar.add(m)
             tar.close()
             archive.close()
         src_namespace = ContainerNamespace(
