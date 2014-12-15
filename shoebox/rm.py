@@ -10,23 +10,7 @@ logger = logging.getLogger('shoebox.rm')
 
 
 def rm_layer(namespace):
-    pid = os.fork()
-    if pid:
-        _, ret = os.waitpid(pid, 0)
-        exitcode = ret >> 8
-        exitsig = ret & 0x7f
-        if exitsig:
-            raise RuntimeError('Caught signal {0} while removing {1}'.format(exitsig, namespace.target))
-        elif exitcode:
-            raise RuntimeError('Removal of {1} exited with status {0}'.format(exitcode, namespace.target))
-    else:
-        namespace.build()
-        exitcode = 1
-        try:
-            shutil.rmtree('/', ignore_errors=True)
-            exitcode = 0
-        finally:
-            os._exit(exitcode)
+    namespace.run(shutil.rmtree, '/', ignore_errors=True)
 
 
 def remove_container(shoebox_dir, container_id, volumes=False, target_uid=None, target_gid=None):

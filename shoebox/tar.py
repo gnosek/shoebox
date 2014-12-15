@@ -3,7 +3,6 @@ import logging
 import tarfile
 import operator
 import errno
-import sys
 
 import os
 
@@ -45,6 +44,9 @@ def extract(tar, dest_dir):
         except tarfile.ExtractError as e:
             logger.warning('Failed to set permissions/times on {0}: {1}'.format(dirpath, e))
 
+    # close the archive stream
+    tar.close()
+
 
 class ExtractTarBase(object):
     def __init__(self, namespace, dest_dir):
@@ -60,18 +62,11 @@ class ExtractTarBase(object):
                 # oh well, this happens
                 os._exit(0)
             raise
-        exitcode = 1
-        try:
-            self.namespace.build()
-            # generally insecure but we're enclosed in the target namespace
-            # so if things break, don't do that
-            extract(tar, self.dest_dir)
-            tar.close()
-            exitcode = 0
-        except Exception as exc:
-            print >> sys.stderr, exc
-        finally:
-            os._exit(exitcode)
+
+        # generally extracting arbitrary archives is insecure but we're
+        # enclosed in the target namespace so if things break, damage is
+        # limited to the container
+        self.namespace.execns(extract, tar, self.dest_dir)
 
     def pre_setup(self):
         raise NotImplementedError()

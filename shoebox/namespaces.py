@@ -293,3 +293,27 @@ class ContainerNamespace(object):
     def build(self):
         build_container_namespace(
             self.target, self.layers, self.volumes, self.target_uid, self.target_gid, self.special_fs)
+
+    def execns(self, ns_func, *args, **kwargs):
+        exitcode = 1
+        try:
+            self.build()
+            ns_func(*args, **kwargs)
+            exitcode = 0
+        except:
+            logger.exception('Exception inside namespace')
+        finally:
+            os._exit(exitcode)
+
+    def run(self, ns_func, *args, **kwargs):
+        pid = os.fork()
+        if pid:
+            _, ret = os.waitpid(pid, 0)
+            exitcode = ret >> 8
+            exitsig = ret & 0x7f
+            if exitsig:
+                raise RuntimeError('Subprocess caught signal {0}'.format(exitsig))
+            elif exitcode:
+                raise RuntimeError('Subprocess exited with status {0}'.format(exitcode))
+        else:
+            self.execns(ns_func, *args, **kwargs)

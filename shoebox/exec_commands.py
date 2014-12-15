@@ -41,18 +41,7 @@ def exec_in_namespace(context, command):
 class RunCommand(namedtuple('RunCommand', 'command context')):
     def execute(self, exec_context):
         logger.info('RUN {0}'.format(self.command))
-        pid = os.fork()
-        if pid:
-            _, ret = os.waitpid(pid, 0)
-            exitcode = ret >> 8
-            exitsig = ret & 0x7f
-            if exitsig:
-                raise RuntimeError('Command caught signal {0}'.format(exitsig))
-            elif exitcode:
-                raise RuntimeError('Command exited with status {0}'.format(exitcode))
-        else:
-            exec_context.namespace.build()
-            exec_in_namespace(self.context, self.command)
+        exec_context.namespace.run(exec_in_namespace, self.context, self.command)
 
 
 class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):

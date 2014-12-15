@@ -94,16 +94,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     namespace = ContainerNamespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
 
     if rm:
-        pid = os.fork()
-        if pid:
-            _, ret = os.waitpid(pid, 0)
-            exitcode = ret >> 8
-            exitsig = ret & 0x7f
-            if exitsig:
-                exitcode = exitsig + 128
-
-            remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
-            os._exit(exitcode)
-
-    namespace.build()
-    exec_in_namespace(context, command)
+        namespace.run(exec_in_namespace, context, command)
+        remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
+    else:
+        namespace.execns(exec_in_namespace, context, command)
