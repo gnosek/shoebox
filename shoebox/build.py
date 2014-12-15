@@ -8,16 +8,30 @@ from shoebox.pull import ImageRepository, DEFAULT_INDEX
 
 logger = logging.getLogger('shoebox.build')
 
+def mangle_volume_name(vol):
+    return vol.strip('/').replace('_', '__').replace('/', '_')
+
 def build(base_dir, force, dockerfile, repo, shoebox_dir, target_gid, target_uid):
     container_id = os.urandom(32).encode('hex')
     runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
     target_base = os.path.join(runtime_dir, 'base')
     target_delta = os.path.join(runtime_dir, 'delta')
     target_root = os.path.join(runtime_dir, 'root')
+    volume_root = os.path.join(runtime_dir, 'volumes')
     metadata_file = os.path.join(runtime_dir, 'metadata.json')
     repo.unpack(target_base, dockerfile.base_image_id, force)
+
     with open(metadata_file, 'w') as fp:
         json.dump(to_docker_metadata(container_id, dockerfile), fp, indent=4)
+
+    volumes = []
+    for vol in dockerfile.volumes:
+        target = os.path.join(volume_root, mangle_volume_name(vol)).encode('utf-8')
+        while os.path.exists(target) and os.path.islink(target):
+            target = os.readlink(target)
+        if not os.path.exists(target):
+            os.makedirs(target, mode=0o755)
+        volumes.append((target, vol))
     exec_context = ExecContext(
         namespace=ContainerNamespace(
             target=target_root,
