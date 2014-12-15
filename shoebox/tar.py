@@ -10,42 +10,52 @@ import os
 logger = logging.getLogger('shoebox.tar')
 
 
-def extract(tar, dest_dir):
-    """Extract files, ignoring permission errors
+class ContainerTarFile(tarfile.TarFile):
 
-    Done on one pass instead of extractall loop to support tar streams.
-    Mostly copied from TarFile.extractall()
-    """
-    directories = []
+    def gettarinfo(self, name=None, arcname=None, fileobj=None):
+        tarinfo = super(ContainerTarFile, self).gettarinfo(name, arcname, fileobj)
+        tarinfo.uid = 0
+        tarinfo.gid = 0
+        tarinfo.uname = 'root'
+        tarinfo.gname = 'root'
+        return tarinfo
 
-    for tarinfo in tar:
-        if tarinfo.isdir():
-            # Extract directories with a safe mode.
-            directories.append(tarinfo)
-            tarinfo = copy.copy(tarinfo)
-            tarinfo.mode = 0700
-        try:
-            tar.extract(tarinfo, dest_dir)
-        except OSError as exc:
-            if exc.errno == errno.EPERM:
-                logger.warning('Insufficient permissions to extract {0}, skipping'.format(tarinfo.name))
+    def extractall(self, path='.', members=None):
+        """Extract files, ignoring permission errors
 
-    # Reverse sort directories.
-    directories.sort(key=operator.attrgetter('name'))
-    directories.reverse()
+        Done on one pass instead of extractall loop to support tar streams.
+        Mostly copied from TarFile.extractall()
+        """
+        directories = []
 
-    # Set correct owner, mtime and filemode on directories.
-    for tarinfo in directories:
-        dirpath = os.path.join(dest_dir, tarinfo.name)
-        try:
-            tar.chown(tarinfo, dirpath)
-            tar.utime(tarinfo, dirpath)
-            tar.chmod(tarinfo, dirpath)
-        except tarfile.ExtractError as e:
-            logger.warning('Failed to set permissions/times on {0}: {1}'.format(dirpath, e))
+        for tarinfo in self:
+            if tarinfo.isdir():
+                # Extract directories with a safe mode.
+                directories.append(tarinfo)
+                tarinfo = copy.copy(tarinfo)
+                tarinfo.mode = 0700
+            try:
+                self.extract(tarinfo, path)
+            except OSError as exc:
+                if exc.errno == errno.EPERM:
+                    logger.warning('Insufficient permissions to extract {0}, skipping'.format(tarinfo.name))
 
-    # close the archive stream
-    tar.close()
+        # Reverse sort directories.
+        directories.sort(key=operator.attrgetter('name'))
+        directories.reverse()
+
+        # Set correct owner, mtime and filemode on directories.
+        for tarinfo in directories:
+            dirpath = os.path.join(path, tarinfo.name)
+            try:
+                self.chown(tarinfo, dirpath)
+                self.utime(tarinfo, dirpath)
+                self.chmod(tarinfo, dirpath)
+            except tarfile.ExtractError as e:
+                logger.warning('Failed to set permissions/times on {0}: {1}'.format(dirpath, e))
+
+        # close the archive stream
+        self.close()
 
 
 class ExtractTarBase(object):
@@ -56,7 +66,7 @@ class ExtractTarBase(object):
     def extract_from_fp(self, fp):
         # TODO: xz images
         try:
-            tar = tarfile.open(fileobj=fp, mode='r|*')
+            tar = ContainerTarFile.open(fileobj=fp, mode='r|*')
         except tarfile.ReadError as exc:
             if exc.message == 'empty file':
                 # oh well, this happens
@@ -66,7 +76,7 @@ class ExtractTarBase(object):
         # generally extracting arbitrary archives is insecure but we're
         # enclosed in the target namespace so if things break, damage is
         # limited to the container
-        self.namespace.execns(extract, tar, self.dest_dir)
+        self.namespace.execns(tar.extractall, self.dest_dir)
 
     def pre_setup(self):
         raise NotImplementedError()
@@ -138,7 +148,7 @@ class CopyFiles(ExtractTarBase):
         try:
             os.chdir(self.src_dir)
             archive = os.fdopen(self.wpipe, 'w')
-            tar = tarfile.open(fileobj=archive, mode='w|')
+            tar = ContainerTarFile.open(fileobj=archive, mode='w|')
             for m in self.members:
                 # TODO: check absolute paths not stepping outside src_dir
                 # maybe enclose in a namespace itself
