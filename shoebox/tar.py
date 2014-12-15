@@ -3,8 +3,11 @@ import logging
 import tarfile
 import operator
 import errno
+import urlparse
+import datetime
 
 import os
+import requests
 from shoebox.namespaces import ContainerNamespace
 
 
@@ -143,16 +146,19 @@ class CopyFiles(ExtractTarBase):
     def pre_setup(self):
         self.rpipe, self.wpipe = os.pipe()
 
+    def add(self, tar, member):
+        if os.path.isdir(member):
+            tar.add(member, arcname='.')
+        else:
+            tar.add(member)
+
     def parent_setup(self):
         os.close(self.rpipe)
         archive = os.fdopen(self.wpipe, 'w')
         tar = ContainerTarFile.open(fileobj=archive, mode='w|')
         def tar_add():
             for m in self.members:
-                if os.path.isdir(m):
-                    tar.add(m, arcname='.')
-                else:
-                    tar.add(m)
+                self.add(tar, m)
             tar.close()
             archive.close()
         src_namespace = ContainerNamespace(
@@ -163,3 +169,20 @@ class CopyFiles(ExtractTarBase):
     def child_setup(self):
         os.close(self.wpipe)
         return os.fdopen(self.rpipe, 'r')
+
+
+class DownloadFiles(CopyFiles):
+
+    def add(self, tar, member):
+        response = requests.get(member, stream=True)
+        response.raise_for_status()
+        parsed = urlparse.urlparse(member)
+        basename = os.path.basename(parsed.netloc.rstrip('/'))
+        tarinfo = tarfile.TarInfo(name=basename)
+        try:
+            size = int(response.headers['Content-Length'])
+        except (KeyError, ValueError):
+            size = None
+        tarinfo.size = size
+        tarinfo.mtime = datetime.datetime.now()
+        tar.add(tarinfo, fileobj=response.raw)

@@ -1,7 +1,7 @@
 from collections import namedtuple
 import os
 import logging
-from shoebox.tar import CopyFiles
+from shoebox.tar import CopyFiles, DownloadFiles
 
 
 logger = logging.getLogger('shoebox.exec_commands')
@@ -55,9 +55,22 @@ class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
-        if exec_context.basedir is None:
-            logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(self.src_paths, self.dst_path))
-            return
-        logger.info('ADD {0} -> {1}'.format(self.src_paths, self.dst_path))
-        # TODO: fetch remote URLs, unpack archives (even though it's kind of dumb)
-        CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
+        files = []
+        urls = []
+
+        for src in self.src_paths:
+            if src.startswith('http://') or src.startswith('https://'):
+                urls.append(src)
+            else:
+                files.append(src)
+
+        if urls:
+            DownloadFiles(exec_context.namespace, self.dst_path, exec_context.namespace.target, urls).run()
+
+        if files:
+            if exec_context.basedir is None:
+                logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(files, self.dst_path))
+                return
+            logger.info('ADD {0} -> {1}'.format(files, self.dst_path))
+            # TODO: unpack archives (even though it's kind of dumb)
+            CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, files).run()
