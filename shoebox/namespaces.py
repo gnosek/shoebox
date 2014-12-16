@@ -302,6 +302,9 @@ class ContainerNamespace(object):
         self.target_gid = target_gid
         self.special_fs = special_fs
 
+    def __repr__(self):
+        return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(id=id(self), **self.__dict__)
+
     def build(self):
         build_container_namespace(
             self.target, self.layers, self.volumes, self.target_uid, self.target_gid, self.special_fs)
@@ -313,7 +316,7 @@ class ContainerNamespace(object):
             ns_func(*args, **kwargs)
             exitcode = 0
         except:
-            logger.exception('Exception inside namespace')
+            logger.exception('Exception inside namespace {0!r}'.format(self))
         finally:
             os._exit(exitcode)
 
