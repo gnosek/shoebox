@@ -185,4 +185,5 @@ class DownloadFiles(CopyFiles):
             size = None
         tarinfo.size = size
         tarinfo.mtime = datetime.datetime.now()
+        response.raw.decode_content = True
         tar.add(tarinfo, fileobj=response.raw)
