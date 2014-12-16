@@ -1,4 +1,5 @@
 from collections import namedtuple
+import errno
 import os
 import logging
 from shoebox.tar import CopyFiles, DownloadFiles
@@ -8,32 +9,68 @@ logger = logging.getLogger('shoebox.exec_commands')
 
 
 def get_passwd_id(path, key):
-    for entry in open(path):
-        fields = entry.strip().split(':')
-        if fields[0] == key:
-            return int(fields[2]), int(fields[3])
+    try:
+        for entry in open(path):
+            fields = entry.strip().split(':')
+            if fields[0] == key:
+                return int(fields[2]), int(fields[3])
+    except IOError:
+        if key in ('root', ''):
+            return 0, 0
+        raise
     raise KeyError('{0} not found in {1}'.format(key, path))
 
 
 def get_groups(path, user):
     groups = set()
-    for entry in open(path):
-        fields = entry.strip().split(':')
-        if len(fields) > 3:
-            members = fields[3].split(',')
-            if user in members:
-                groups.add(int(fields[2]))
+    try:
+        for entry in open(path):
+            fields = entry.strip().split(':')
+            if len(fields) > 3:
+                members = fields[3].split(',')
+                if user in members:
+                    groups.add(int(fields[2]))
+    except IOError:
+        if user in ('root', ''):
+            return {0}
+        raise
     return groups
 
 
 def exec_in_namespace(context, command):
-    uid, gid = get_passwd_id('/etc/passwd', context.user)
-    groups = get_groups('/etc/group', context.user)
-    os.setgroups(list(groups))
-    os.setgid(gid)
-    os.setuid(uid)
-    os.setegid(gid)
-    os.seteuid(uid)
+    if os.geteuid() != 0:
+        uid, gid = os.getuid(), os.getgid()
+        groups = set(os.getgroups())
+        if context.user not in ('root', ''):
+            logger.warning('Ignoring request to switch to user {0}, running whole container as {1}:{2} already'.format(
+                context.user, uid, gid))
+    else:
+        uid, gid = get_passwd_id('/etc/passwd', context.user)
+        groups = get_groups('/etc/group', context.user)
+    setgroups_fallback = False
+    try:
+        os.setgroups(list(groups))
+    except OSError as exc:
+        if exc.errno == errno.EINVAL:
+            # cannot map all the groups, e.g. when running in 1:1 uid map
+            logger.warning('Failed to map groups, possibly due to direct uid/gid mapping')
+            setgroups_fallback = True
+        else:
+            raise
+    try:
+        if setgroups_fallback:
+            os.setgroups([gid])
+        os.setgid(gid)
+        os.setuid(uid)
+        os.setegid(gid)
+        os.seteuid(uid)
+    except OSError as exc:
+        if exc.errno == errno.EINVAL:
+            logger.error(
+                'Cannot switch to user {0} ({1}:{2}), possibly due to direct uid/gid mapping'.format(
+                    context.user, uid, gid))
+            os._exit(1)
+
     os.chdir(context.workdir)
     os.execvpe(command[0], command, context.environ)
 

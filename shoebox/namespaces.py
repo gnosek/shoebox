@@ -49,16 +49,19 @@ def load_id_map(path, base_id):
     id_ranges = []
     can_map_self = False
 
-    with open(path) as fp:
-        for line in fp:
-            map_login, id_min, id_count = line.strip().split(':')
-            if map_login != username:
-                continue
-            id_min = int(id_min)
-            id_count = int(id_count)
-            if id_min <= base_id < id_min + id_count:
-                can_map_self = True
-            id_ranges.append(((id_min, id_count)))
+    try:
+        with open(path) as fp:
+            for line in fp:
+                map_login, id_min, id_count = line.strip().split(':')
+                if map_login != username:
+                    continue
+                id_min = int(id_min)
+                id_count = int(id_count)
+                if id_min <= base_id < id_min + id_count:
+                    can_map_self = True
+                id_ranges.append(((id_min, id_count)))
+    except IOError:
+        return
 
     if id_ranges and not can_map_self:
         logger.warning(
@@ -103,10 +106,15 @@ def create_userns(target_uid=None, target_gid=None):
             finally:
                 os._exit(exitcode)
         else:
+            uid, gid = os.getuid(), os.getgid()
             os.close(rd)
             unshare(CLONE_NEWUSER)
             os.close(wr)
-            os.waitpid(pid, 0)
+            _, ret = os.waitpid(pid, 0)
+            if ret != 0:
+                logger.warning('UID/GID helper failed to run, mapping root directly')
+                single_id_map('uid', 0, uid)
+                single_id_map('gid', 0, gid)
             return 0, 0
     elif target_uid is None or target_gid is None:
         raise RuntimeError('If either of target uid/gid is present both are required')
@@ -238,7 +246,7 @@ def pivot_namespace_root(target):
     os.rmdir(pivoted_old_root)
 
 
-def create_namespaces(target, layers, volumes, special_fs=True):
+def create_namespaces(target, layers, volumes, special_fs=True, is_root=True):
     unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
     if pid:
@@ -257,7 +265,10 @@ def create_namespaces(target, layers, volumes, special_fs=True):
         mount_volumes(target_subdir, volumes)
 
     if special_fs:
-        mount_devices(target_subdir)
+        if is_root:
+            mount_devices(target_subdir)
+        else:
+            logger.warning('Cannot mount devpts when not mapping to root, expect TTY malfunction')
         mount_procfs(target_subdir)
         mount_sysfs(target_subdir)
     pivot_namespace_root(target)
@@ -271,8 +282,9 @@ def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None
             raise RuntimeError('{0} does not exist'.format(runtime_dir))
 
     target_uid, target_gid = create_userns(target_uid, target_gid)
+    is_root = (target_uid == 0 and target_gid == 0)
 
-    create_namespaces(runtime_dir, layers, volumes, special_fs)
+    create_namespaces(runtime_dir, layers, volumes, special_fs, is_root)
     drop_caps()
     os.seteuid(target_uid)
     os.setegid(target_gid)
