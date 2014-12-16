@@ -4,7 +4,7 @@ import tarfile
 import operator
 import errno
 import urlparse
-import datetime
+import time
 
 import os
 import requests
@@ -163,8 +163,10 @@ class CopyFiles(ExtractTarBase):
             archive.close()
         src_namespace = ContainerNamespace(
             self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid, special_fs=False)
-        src_namespace.run(tar_add)
-        archive.close()
+        try:
+            src_namespace.run(tar_add)
+        finally:
+            archive.close()
 
     def child_setup(self):
         os.close(self.wpipe)
@@ -174,16 +176,17 @@ class CopyFiles(ExtractTarBase):
 class DownloadFiles(CopyFiles):
 
     def add(self, tar, member):
+        logger.info('Downloading {0}'.format(member))
         response = requests.get(member, stream=True)
         response.raise_for_status()
         parsed = urlparse.urlparse(member)
-        basename = os.path.basename(parsed.netloc.rstrip('/'))
+        basename = os.path.basename(parsed.path.rstrip('/'))
         tarinfo = tarfile.TarInfo(name=basename)
         try:
             size = int(response.headers['Content-Length'])
         except (KeyError, ValueError):
             size = None
         tarinfo.size = size
-        tarinfo.mtime = datetime.datetime.now()
+        tarinfo.mtime = int(time.time())
         response.raw.decode_content = True
-        tar.add(tarinfo, fileobj=response.raw)
+        tar.addfile(tarinfo, fileobj=response.raw)
