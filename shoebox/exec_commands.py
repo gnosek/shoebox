@@ -102,7 +102,7 @@ class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
                 files.append(src)
 
         if urls:
-            DownloadFiles(exec_context.namespace, self.dst_path, exec_context.namespace.target, urls).run()
+            DownloadFiles(exec_context.namespace, self.dst_path, exec_context.basedir or '.', urls).run()
 
         if files:
             if exec_context.basedir is None:
