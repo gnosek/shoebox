@@ -1,4 +1,3 @@
-import json
 import logging
 
 import click
@@ -6,19 +5,15 @@ import os
 import re
 
 from shoebox.build import build
-from shoebox.dockerfile import from_docker_metadata, inherit_docker_metadata
+from shoebox.container import Container
+from shoebox.dockerfile import inherit_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
-from shoebox.namespaces import ContainerNamespace
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
 from shoebox.rm import remove_container
 
 
 def is_container_id(container_id):
     return re.match('^[0-9a-f]{64}$', container_id)
-
-
-def mangle_volume_name(vol):
-    return vol.strip('/').replace('_', '__').replace('/', '_')
 
 
 @click.command()
@@ -40,13 +35,8 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     shoebox_dir = os.path.expanduser(shoebox_dir)
 
     if is_container_id(container_id):
-        runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
-        metadata_file = os.path.join(runtime_dir, 'metadata.json')
-        target_base = os.path.join(runtime_dir, 'base')
-        target_delta = os.path.join(runtime_dir, 'delta')
-        target_root = os.path.join(runtime_dir, 'root')
-        volume_root = os.path.join(runtime_dir, 'volumes')
-        metadata = from_docker_metadata(json.load(open(metadata_file)))
+        container = Container(shoebox_dir, container_id)
+        container.load_metadata()
     else:
         storage_dir = os.path.join(shoebox_dir, 'images')
         repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
@@ -57,41 +47,27 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         metadata = repo.metadata(image_id, tag)
         metadata = inherit_docker_metadata(metadata)
         metadata = metadata._replace(run_commands=[])
-        container_id = build(None, force, metadata, repo, shoebox_dir, target_gid, target_uid)
-        runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
-        target_base = os.path.join(runtime_dir, 'base')
-        target_delta = os.path.join(runtime_dir, 'delta')
-        target_root = os.path.join(runtime_dir, 'root')
-        volume_root = os.path.join(runtime_dir, 'volumes')
+        container = build(None, force, metadata, repo, shoebox_dir, target_gid, target_uid)
 
-    volumes = []
-    for vol in metadata.volumes:
-        target = os.path.join(volume_root, mangle_volume_name(vol)).encode('utf-8')
-        while os.path.exists(target) and os.path.islink(target):
-            target = os.readlink(target)
-        if not os.path.exists(target):
-            os.makedirs(target, mode=0o755)
-        volumes.append((target, vol))
+    namespace = container.namespace(target_uid, target_gid)
 
     if entrypoint is None:
-        entrypoint = metadata.entrypoint or []
+        entrypoint = container.metadata.entrypoint or []
     else:
         entrypoint = [entrypoint]
 
     if not command:
-        command = metadata.command or []
+        command = container.metadata.command or []
 
     command = list(entrypoint) + list(command)
     if not command:
         command = ['bash']
 
-    context = metadata.context
+    context = container.metadata.context
     if user:
         context = context._replace(user=user)
     if workdir:
         context = context._replace(workdir=workdir)
-
-    namespace = ContainerNamespace(target_root, [target_base, target_delta], volumes, target_uid, target_gid)
 
     if rm:
         namespace.run(exec_in_namespace, context, command)
