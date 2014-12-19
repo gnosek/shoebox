@@ -1,5 +1,6 @@
 import copy
 import logging
+import shutil
 import tarfile
 import operator
 import errno
@@ -23,6 +24,18 @@ class ContainerTarFile(tarfile.TarFile):
         tarinfo.uname = 'root'
         tarinfo.gname = 'root'
         return tarinfo
+
+    def _extract_member(self, tarinfo, targetpath):
+        dir, base = os.path.split(targetpath)
+        if base.startswith('.wh.'):
+            whiteout = os.path.join(dir, base[len('.wh.'):])
+            if os.path.exists(whiteout):
+                if os.path.isdir(whiteout):
+                    shutil.rmtree(whiteout)
+                else:
+                    os.unlink(whiteout)
+        else:
+            return super(ContainerTarFile, self)._extract_member(tarinfo, targetpath)
 
     def extractall(self, path='.', members=None):
         """Extract files, ignoring permission errors
