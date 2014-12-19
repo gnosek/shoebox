@@ -42,7 +42,12 @@ CAP_MAC_ADMIN = 33
 CAP_SYSLOG = 34
 CAP_WAKE_ALARM = 35
 CAP_BLOCK_SUSPEND = 36
-CAP_LAST_CAP = CAP_BLOCK_SUSPEND
+
+try:
+    with open('/proc/sys/kernel/cap_last_cap') as fp:
+        CAP_LAST_CAP = int(fp.read())
+except (IOError, ValueError):
+    CAP_LAST_CAP = CAP_BLOCK_SUSPEND
 
 DEFAULT_CAPS = (
     CAP_CHOWN,
