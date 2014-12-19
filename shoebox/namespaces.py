@@ -211,6 +211,10 @@ def mount_devices(target_dir_func):
     else:
         bind_mount(os.path.join(devpts, 'ptmx').encode('utf-8'), ptmx.encode('utf-8'))
 
+    devshm = target_dir_func('/dev/shm')
+    if os.path.exists(devshm):
+        mount('devshm', devshm.encode('utf-8'), 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
+
     devices = ('null', 'zero', 'tty', 'random', 'urandom')
     for dev in devices:
         makedev(target_dir_func, '/dev/' + dev)
