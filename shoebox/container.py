@@ -46,4 +46,4 @@ class Container(object):
         return ContainerNamespace(self.target_root, layers, self.volumes(), target_uid, target_gid, special_fs)
 
     def build_namespace(self, target_uid, target_gid):
-        return ContainerNamespace(self.target_root, None, None, target_uid, target_gid, special_fs=False)
+        return ContainerNamespace(self.target_base, None, None, target_uid, target_gid, special_fs=False)
