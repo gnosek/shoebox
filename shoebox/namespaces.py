@@ -240,6 +240,13 @@ def mount_sysfs(target_dir_func):
         logger.debug('Failed to mount sysfs, probably not owned by us')
 
 
+def mount_etc_files(target_dir_func):
+    for path in ('/etc/resolv.conf', '/etc/hosts', '/etc/hostname'):
+        target = target_dir_func(path)
+        bind_mount(path, target)
+        bind_mount(target, target, readonly=True)
+
+
 def pivot_namespace_root(target):
     target = target.encode('utf-8')
     old_root = tempfile.mkdtemp(prefix='.oldroot', dir=target)
@@ -275,6 +282,7 @@ def create_namespaces(target, layers, volumes, special_fs=True, is_root=True):
             logger.warning('Cannot mount devpts when not mapping to root, expect TTY malfunction')
         mount_procfs(target_subdir)
         mount_sysfs(target_subdir)
+        mount_etc_files(target_subdir)
     pivot_namespace_root(target)
 
 
