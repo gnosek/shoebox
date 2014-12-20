@@ -132,7 +132,7 @@ class ImageRepository(object):
 
         for image_id in reversed(self.ancestors(image_id)):
             layer = self.download_image(image_id, force=force_download)
-            namespace = ContainerNamespace(target_dir, layers=None)
+            namespace = ContainerNamespace(target_dir, layers=None, special_fs=False)
             tar.ExtractTarFile(namespace, '/', layer).run()
 
         self.logger.info('Unpacked {0} in {1}'.format(image_id, target_dir))
