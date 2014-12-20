@@ -18,6 +18,6 @@ setup(
         shoebox-rm=shoebox.rm:cli
 
         shoebox-ancestry=shoebox.pull:ancestry
-        shoebox-metadata=shoebox.pull:metadata
+        shoebox-metadata=shoebox.pull:get_metadata
     ''',
 )

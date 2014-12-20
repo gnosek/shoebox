@@ -1,15 +1,18 @@
 import json
 import logging
+
 import os
 import requests
 import click
+
 from shoebox import tar
 from shoebox.namespaces import ContainerNamespace
 
+
 DEFAULT_INDEX = 'https://index.docker.io'
 
-class ImageRepository(object):
 
+class ImageRepository(object):
     def __init__(self, index_url=DEFAULT_INDEX, storage_dir='images'):
         self.index_url = index_url
         self.token = None
@@ -19,12 +22,14 @@ class ImageRepository(object):
 
     def request_access(self, image):
         self.logger.info('Requesting access to image {0} at {1}'.format(image, self.index_url))
-        response = requests.get('{0}/v1/repositories/{1}/images'.format(self.index_url, image), headers={'X-Docker-Token': 'true'})
+        response = requests.get('{0}/v1/repositories/{1}/images'.format(self.index_url, image),
+                                headers={'X-Docker-Token': 'true'})
         response.raise_for_status()
 
         self.token = response.headers.get('X-Docker-Token')
         repository_protocol = self.index_url.split(':', 1)[0]
-        self.repositories = ['{0}://{1}'.format(repository_protocol, r.strip()) for r in response.headers['X-Docker-Endpoints'].split(',')]
+        self.repositories = ['{0}://{1}'.format(repository_protocol, r.strip()) for r in
+                             response.headers['X-Docker-Endpoints'].split(',')]
         if not self.repositories:
             self.repositories = [self.index_url]
 
@@ -72,7 +77,7 @@ class ImageRepository(object):
     def download_metadata(self, image_id, force=False):
         path = os.path.join(self.storage_dir, image_id + '.json')
         if not force and os.path.exists(path):
-            #  already downloaded
+            # already downloaded
             metadata = open(path)
             return json.load(metadata)
 
@@ -87,7 +92,7 @@ class ImageRepository(object):
     def download_image(self, image_id, force=False):
         path = os.path.join(self.storage_dir, image_id)
         if not force and os.path.exists(path):
-            #  already downloaded
+            # already downloaded
             return path
 
         if not os.path.exists(self.storage_dir):
@@ -164,7 +169,9 @@ def pull(image, tag='latest', force=False, index_url=DEFAULT_INDEX, storage_dir=
     metadata = repo.pull(image, tag, force)
 
     import pprint
+
     pprint.pprint(metadata[-1])
+
 
 @click.command()
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
@@ -176,11 +183,12 @@ def ancestry(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images')
     for image_id in repo.ancestry(image, tag):
         print image_id
 
+
 @click.command()
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
 @click.option('--tag', default='latest', help='tag to pull')
 @click.argument('image')
-def metadata(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images'):
+def get_metadata(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images'):
     logging.basicConfig(level=logging.DEBUG)
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
     print json.dumps(repo.metadata(image, tag), indent=4)

@@ -114,10 +114,12 @@ def cap_errcheck(result, func, args):
         raise OSError('Call to {0}{1!r} failed'.format(func.__name__, args))
     return args
 
+
 def cap_get_proc_errcheck(result, func, args):
     if not result:
         raise OSError('Call to {0}{1!r} failed'.format(func.__name__, args))
     return args
+
 
 cap_t = c_void_p  # opaque structure
 
@@ -165,7 +167,7 @@ def drop_caps(cap_keep=DEFAULT_CAPS):
     cap_flags = (cap_value_t * ncaps)(*cap_keep)
 
     cap_set = frozenset(cap_keep)
-    for cap in range(0, CAP_LAST_CAP+1):
+    for cap in range(0, CAP_LAST_CAP + 1):
         if cap not in cap_set:
             cap_drop_bound(cap)
 

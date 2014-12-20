@@ -1,7 +1,9 @@
 from collections import namedtuple
 import errno
-import os
 import logging
+
+import os
+
 from shoebox.tar import CopyFiles, DownloadFiles
 
 

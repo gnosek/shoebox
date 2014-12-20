@@ -59,7 +59,7 @@ def load_id_map(path, base_id):
                 id_count = int(id_count)
                 if id_min <= base_id < id_min + id_count:
                     can_map_self = True
-                id_ranges.append(((id_min, id_count)))
+                id_ranges.append((id_min, id_count))
     except IOError:
         return
 
@@ -307,7 +307,8 @@ class ContainerNamespace(object):
         self.special_fs = special_fs
 
     def __repr__(self):
-        return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(id=id(self), **self.__dict__)
+        return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(
+            id=id(self), **self.__dict__)
 
     def build(self):
         build_container_namespace(
@@ -315,6 +316,7 @@ class ContainerNamespace(object):
 
     def execns(self, ns_func, *args, **kwargs):
         exitcode = 1
+        # noinspection PyBroadException
         try:
             self.build()
             ns_func(*args, **kwargs)

@@ -37,7 +37,6 @@ DirectiveValue = p.Combine(
 
 
 class Stanza(object):
-
     onbuild_allowed = True
 
     def __repr__(self):
@@ -87,7 +86,6 @@ class FROM_command(DockerfileCommand):
                 context = inherit_docker_metadata(metadata)
             return context
 
-
     image_name = p.Word(p.alphanums + './-')
     tag = ch(':').suppress() + p.Word(p.alphanums + '.-')
 
@@ -122,8 +120,9 @@ class EnvRefCommand(DockerfileCommand):
 
     env_var = p.Word(p.alphas + '_', bodyChars=p.alphanums + '_')
 
-    env_ref = p.Combine(ch('$') + env_var('ref')) | \
-              p.Combine(ch('${') + env_var('ref') + ch('}').suppress())
+    env_ref = \
+        p.Combine(ch('$') + env_var('ref')) | \
+        p.Combine(ch('${') + env_var('ref') + ch('}').suppress())
 
     env_value = p.OneOrMore(
         p.MatchFirst((
@@ -210,7 +209,8 @@ class ADD_command(EnvRefCommand):
             self.destination = path_list[-1]
 
         def __str__(self):
-            return 'ADD {0} {1}'.format(' '.join([''.join(str(v) for v in src) for src in self.sources]), ''.join(str(v) for v in self.destination))
+            return 'ADD {0} {1}'.format(' '.join([''.join(str(v) for v in src) for src in self.sources]),
+                                        ''.join(str(v) for v in self.destination))
 
         def evaluate(self, context):
             environ = context.context.environ
@@ -233,7 +233,8 @@ class COPY_command(EnvRefCommand):
             self.destination = path_list[-1]
 
         def __str__(self):
-            return 'COPY {0} {1}'.format(' '.join([''.join(str(v) for v in src) for src in self.sources]), ''.join(str(v) for v in self.destination))
+            return 'COPY {0} {1}'.format(' '.join([''.join(str(v) for v in src) for src in self.sources]),
+                                         ''.join(str(v) for v in self.destination))
 
         def evaluate(self, context):
             environ = context.context.environ
@@ -306,13 +307,11 @@ class USER_command(EnvRefCommand):
             subcontext = context.context._replace(user=username)
             return context._replace(context=subcontext)
 
-
     parser = EnvRefCommand.env_word_value('name').setParseAction(User)
 
 
 class MAINTAINER_command(EnvRefCommand):
     class Maintainer(Stanza):
-
         onbuild_allowed = False
 
         def __init__(self, maintainer):
@@ -385,7 +384,6 @@ class ENTRYPOINT_command(ExecCommand):
 
 class ONBUILD_command(DockerfileCommand):
     class OnBuild(Stanza):
-
         onbuild_allowed = False
 
         def __init__(self, tokens):
@@ -549,7 +547,7 @@ def to_docker_metadata(container_id, dockerfile):
         volumes = None
 
     if dockerfile.expose:
-        ports = dict(('{0}/tcp'.format(p), {}) for p in sorted(dockerfile.expose))
+        ports = dict(('{0}/tcp'.format(port), {}) for port in sorted(dockerfile.expose))
     else:
         ports = None
 

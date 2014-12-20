@@ -9,6 +9,7 @@ import time
 
 import os
 import requests
+
 from shoebox.namespaces import ContainerNamespace
 
 
@@ -16,7 +17,6 @@ logger = logging.getLogger('shoebox.tar')
 
 
 class ContainerTarFile(tarfile.TarFile):
-
     def gettarinfo(self, name=None, arcname=None, fileobj=None):
         tarinfo = super(ContainerTarFile, self).gettarinfo(name, arcname, fileobj)
         tarinfo.uid = 0
@@ -26,9 +26,9 @@ class ContainerTarFile(tarfile.TarFile):
         return tarinfo
 
     def _extract_member(self, tarinfo, targetpath):
-        dir, base = os.path.split(targetpath)
+        directory, base = os.path.split(targetpath)
         if base.startswith('.wh.'):
-            whiteout = os.path.join(dir, base[len('.wh.'):])
+            whiteout = os.path.join(directory, base[len('.wh.'):])
             if os.path.exists(whiteout):
                 if os.path.isdir(whiteout):
                     shutil.rmtree(whiteout)
@@ -169,13 +169,16 @@ class CopyFiles(ExtractTarBase):
         os.close(self.rpipe)
         archive = os.fdopen(self.wpipe, 'w')
         tar = ContainerTarFile.open(fileobj=archive, mode='w|')
+
         def tar_add():
             for m in self.members:
                 self.add(tar, m)
             tar.close()
             archive.close()
+
         src_namespace = ContainerNamespace(
-            self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid, special_fs=False)
+            self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid,
+            special_fs=False)
         try:
             src_namespace.run(tar_add)
         finally:
@@ -187,7 +190,6 @@ class CopyFiles(ExtractTarBase):
 
 
 class DownloadFiles(CopyFiles):
-
     def add(self, tar, member):
         logger.info('Downloading {0}'.format(member))
         response = requests.get(member, stream=True)
