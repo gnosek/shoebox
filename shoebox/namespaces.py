@@ -205,7 +205,7 @@ def mount_devices(target_dir_func):
     if not os.path.exists(devpts):
         os.makedirs(devpts, mode=0o755)
 
-    mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'newinstance')
+    mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'newinstance,ptmxmode=0666')
     if not os.path.exists(ptmx):
         os.symlink('pts/ptmx', ptmx)
     else:
