@@ -83,6 +83,8 @@ class Container(object):
         for tag in os.listdir(self.container_base_dir):
             tag_path = os.path.join(self.container_base_dir, tag)
             if not is_container_id(tag) and os.path.islink(tag_path):
-                target = os.path.abspath(os.readlink(tag_path))
+                target = os.readlink(tag_path)
+                if not target.startswith('/'):
+                    target = os.path.abspath(os.path.join(self.container_base_dir, target))
                 if target == self.runtime_dir:
                     yield tag

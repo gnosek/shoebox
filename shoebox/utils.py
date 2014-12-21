@@ -15,13 +15,14 @@ def ls(shoebox_dir, quiet):
     container_dir = os.path.join(shoebox_dir, 'containers')
     for container_id in os.listdir(container_dir):
         if is_container_id(container_id):
-            print container_id
             if quiet:
+                print container_id
                 continue
+            print 'container id:', container_id
             container = Container(shoebox_dir, container_id)
             tags = list(container.tags())
             if tags:
-                print 'tags:', ' '.join(tags)
+                print '  tags:', ' '.join(tags)
 
 
 @click.command()
@@ -30,6 +31,8 @@ def ps(shoebox_dir):
     shoebox_dir = os.path.expanduser(shoebox_dir)
     container_dir = os.path.join(shoebox_dir, 'containers')
     for container_id in os.listdir(container_dir):
+        if not is_container_id(container_id):
+            continue
         container = Container(shoebox_dir, container_id)
         pid = container.pid()
         if not pid:
@@ -37,11 +40,15 @@ def ps(shoebox_dir):
         print container_id
         ip = container.ip_address()
         if ip:
-            print 'ip address:', ip
+            print '  ip address:', ip
         tags = list(container.tags())
         if tags:
-            print 'tags:', ' '.join(tags)
-        subprocess.check_call(['pstree', '-ap', str(pid)])
+            print '  tags:', ' '.join(tags)
+        print '  process tree:'
+        pstree = subprocess.check_output(['pstree', '-ap', str(pid)])
+        for line in pstree.splitlines():
+            print '    ' + line
+        print
 
 
 @click.command()
