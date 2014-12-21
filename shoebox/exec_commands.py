@@ -51,7 +51,7 @@ def exec_in_namespace(context, command):
         groups = get_groups('/etc/group', context.user)
     setgroups_fallback = False
     try:
-        os.setgroups(list(groups))
+        os.setgroups(list(groups) + [gid])
     except OSError as exc:
         if exc.errno == errno.EINVAL:
             # cannot map all the groups, e.g. when running in 1:1 uid map
