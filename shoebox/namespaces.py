@@ -241,10 +241,17 @@ def mount_sysfs(target_dir_func):
 
 
 def mount_etc_files(target_dir_func):
+    tmpfs = tempfile.mkdtemp(prefix='.etc', dir=target_dir_func('/'))
+    mount('tmpfs', tmpfs.encode('utf-8'), 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'size=1m')
     for path in ('/etc/resolv.conf', '/etc/hosts', '/etc/hostname'):
+        content = open(path).read()
+        tmpfile = os.path.join(tmpfs, os.path.basename(path))
+        with open(tmpfile, 'w') as fp:
+            fp.write(content)
         target = target_dir_func(path)
-        bind_mount(path, target)
-        bind_mount(target, target, readonly=True)
+        bind_mount(tmpfile.encode('utf-8'), target.encode('utf-8'))
+    libc.umount2(tmpfs.encode('utf-8'), MNT_DETACH)
+    os.rmdir(tmpfs)
 
 
 def pivot_namespace_root(target):
