@@ -38,13 +38,14 @@ def build(base_dir, force, dockerfile, repo, shoebox_dir, target_gid, target_uid
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
 def cli(base_dir, shoebox_dir, index_url, force, target_uid, target_gid):
     logging.basicConfig(level=logging.INFO)
-    dockerfile_path = os.path.join(base_dir, 'Dockerfile')
+    os.chdir(base_dir)
+    dockerfile_path = 'Dockerfile'
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
     storage_dir = os.path.join(shoebox_dir, 'images')
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
 
     dockerfile = parse_dockerfile(open(dockerfile_path).read(), repo=repo)
-    container = build(base_dir, force, dockerfile, repo, shoebox_dir, target_gid, target_uid)
+    container = build('.', force, dockerfile, repo, shoebox_dir, target_gid, target_uid)
 
     print container.container_id
