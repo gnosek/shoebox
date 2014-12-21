@@ -4,7 +4,7 @@ import logging
 
 import os
 
-from shoebox.tar import CopyFiles, DownloadFiles, detect_tar_format, ExtractTarFile
+from shoebox.tar import CopyFiles, DownloadFiles, detect_tar_format, UnpackArchive
 
 
 logger = logging.getLogger('shoebox.exec_commands')
@@ -93,7 +93,6 @@ class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
 
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
-
     def src_type(self, path):
         if path.startswith('http://') or path.startswith('https://'):
             return 'url'
@@ -113,7 +112,7 @@ class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
             if not basedir:
                 logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(path, self.dst_path))
             logger.info('Extracting {0} -> {1}'.format(path, self.dst_path))
-            ExtractTarFile(namespace, self.dst_path, path).run()
+            UnpackArchive(namespace, self.dst_path, basedir, path).run()
         else:
             logger.info('Copying {0} -> {1}'.format(path, self.dst_path))
             CopyFiles(namespace, self.dst_path, basedir, [path]).run()

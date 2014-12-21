@@ -15,7 +15,6 @@ from shoebox.namespaces import ContainerNamespace
 
 logger = logging.getLogger('shoebox.tar')
 
-
 TARBALL_EXTENSIONS = {
     '.tar': 'uncompressed',
     '.tar.gz': 'gzip',
@@ -178,16 +177,55 @@ class ExtractTarFile(ExtractTarBase):
         return open(self.archive_path)
 
 
-class CopyFiles(ExtractTarBase):
-    def __init__(self, namespace, dest_dir, src_dir, members):
-        super(CopyFiles, self).__init__(namespace, dest_dir)
+class ExtractNamespacedTar(ExtractTarBase):
+    def __init__(self, namespace, dest_dir, src_dir):
+        super(ExtractNamespacedTar, self).__init__(namespace, dest_dir)
         self.src_dir = src_dir
-        self.members = members
         self.rpipe = None
         self.wpipe = None
 
     def pre_setup(self):
         self.rpipe, self.wpipe = os.pipe()
+
+    def src_namespace(self):
+        return ContainerNamespace(
+            self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid,
+            special_fs=False)
+
+    def child_setup(self):
+        os.close(self.wpipe)
+        return os.fdopen(self.rpipe, 'r')
+
+    def build_tar_archive(self, archive):
+        raise NotImplementedError()
+
+    def parent_setup(self):
+        os.close(self.rpipe)
+        archive = os.fdopen(self.wpipe, 'w')
+        try:
+            self.build_tar_archive(archive)
+        finally:
+            archive.close()
+
+
+class UnpackArchive(ExtractNamespacedTar):
+    def __init__(self, namespace, dest_dir, src_dir, archive_path):
+        super(UnpackArchive, self).__init__(namespace, dest_dir, src_dir)
+        self.archive_path = archive_path
+
+    def build_tar_archive(self, archive):
+        def tar_read():
+            tar = open(self.archive_path)
+            shutil.copyfileobj(tar, archive)
+            archive.close()
+
+        self.src_namespace().run(tar_read)
+
+
+class CopyFiles(ExtractNamespacedTar):
+    def __init__(self, namespace, dest_dir, src_dir, members):
+        super(CopyFiles, self).__init__(namespace, dest_dir, src_dir)
+        self.members = members
 
     def add(self, tar, member):
         if os.path.isdir(member):
@@ -195,9 +233,7 @@ class CopyFiles(ExtractTarBase):
         else:
             tar.add(member)
 
-    def parent_setup(self):
-        os.close(self.rpipe)
-        archive = os.fdopen(self.wpipe, 'w')
+    def build_tar_archive(self, archive):
         tar = ContainerTarFile.open(fileobj=archive, mode='w|')
 
         def tar_add():
@@ -206,17 +242,7 @@ class CopyFiles(ExtractTarBase):
             tar.close()
             archive.close()
 
-        src_namespace = ContainerNamespace(
-            self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid,
-            special_fs=False)
-        try:
-            src_namespace.run(tar_add)
-        finally:
-            archive.close()
-
-    def child_setup(self):
-        os.close(self.wpipe)
-        return os.fdopen(self.rpipe, 'r')
+        self.src_namespace().run(tar_add)
 
 
 class DownloadFiles(CopyFiles):
