@@ -193,8 +193,14 @@ class EXPOSE_command(EnvRefCommand):
 
         def evaluate(self, context):
             environ = context.context.environ
-            port = int(''.join(v.expand(environ) for v in self.port))
-            context = context._replace(expose=context.expose + [port])
+            port = ''.join(v.expand(environ) for v in self.port)
+            if '/' in port:
+                port, proto = port.split('/', 1)
+                port = int(port)
+            else:
+                proto = 'tcp'
+                port = int(port)
+            context = context._replace(expose=context.expose | set(((port, proto),)))
             return context
 
     single_parser = EnvRefCommand.env_word_value('port').setParseAction(ExposePort)
@@ -469,7 +475,7 @@ def empty_dockerfile(repo):
         base_image_id=None,
         context=context,
         run_commands=[],
-        expose=[],
+        expose=set(),
         entrypoint=None,
         volumes=set(),
         command=None,
@@ -498,10 +504,15 @@ def from_docker_metadata(meta_json):
         user=config['User'] or 'root',
         workdir=config['WorkingDir'] or '/')
 
+    def split_port(p):
+        port, proto = p.split('/', 1)
+        port = int(port)
+        return port, proto
+
     if config['ExposedPorts']:
-        ports = [int(port.split('/')[0]) for port in config['ExposedPorts'].keys()]
+        ports = set(split_port(p) for port in config['ExposedPorts'].keys())
     else:
-        ports = []
+        ports = set()
 
     if config['Volumes']:
         volumes = set(config['Volumes'].keys())
@@ -610,6 +621,7 @@ FROM foo/bar:x
 
 # anything after FROM without tag explodes with "expected EOF"
 
+ENV bzz q
 ENV foo /bar
 ENV bar $foo/bar
 ENV baz ${foo}bar$foo
@@ -623,6 +635,9 @@ ENV ak=av bk=bv
 ENV ck="ck ck=${foo}c\"v"
 
 INSERT up-your-ass
+
+EXPOSE 5432
+EXPOSE 5431/tcp
 
 ADD . foo /bar/$bzz
 
