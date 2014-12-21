@@ -2,6 +2,7 @@ from ctypes import CDLL
 import getpass
 import itertools
 import logging
+import collections
 import stat
 import subprocess
 import tempfile
@@ -85,6 +86,36 @@ def single_id_map(map_name, id_inside, id_outside):
         print >> fp, '{0} {1} 1'.format(id_inside, id_outside)
 
 
+class Helper(collections.namedtuple('Helper', 'name pid wr_pipe')):
+
+    def wait(self):
+        os.close(self.wr_pipe)
+        _, ret = os.waitpid(self.pid, 0)
+        exitcode = ret >> 8
+        exitsig = ret & 0x7f
+        if exitsig:
+            exitcode = exitsig + 128
+        if exitcode:
+            raise subprocess.CalledProcessError(cmd=self.name, returncode=exitcode)
+
+
+def spawn_helper(func, *args, **kwargs):
+    rd, wr = os.pipe()
+    pid = os.fork()
+    if pid == 0:  # child
+        os.close(wr)
+        os.read(rd, 1)
+        exitcode = 1
+        try:
+            func(*args, **kwargs)
+            exitcode = 0
+        finally:
+            os._exit(exitcode)
+    else:
+        os.close(rd)
+        return Helper('idmap', pid, wr)
+
+
 def create_userns(target_uid=None, target_gid=None):
     uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
     gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
@@ -97,35 +128,24 @@ def create_userns(target_uid=None, target_gid=None):
         target_gid = 0
 
     uid, gid = os.getuid(), os.getgid()
+    idmap_helper = None
 
     if target_uid is None and target_gid is None:
-        pid = os.fork()
-        rd, wr = os.pipe()
-        if pid == 0:  # child
-            os.close(wr)
-            os.read(rd, 1)
-            exitcode = 1
-            try:
-                apply_id_maps(os.getppid(), uid_map, gid_map)
-                exitcode = 0
-            finally:
-                os._exit(exitcode)
-        else:
-            os.close(rd)
-            unshare(namespaces)
-            os.close(wr)
-            _, ret = os.waitpid(pid, 0)
-            if ret != 0:
-                logger.warning('UID/GID helper failed to run, mapping root directly')
-                single_id_map('uid', 0, uid)
-                single_id_map('gid', 0, gid)
-            return 0, 0
+        idmap_helper = spawn_helper(apply_id_maps, os.getppid(), uid_map, gid_map)
     elif target_uid is None or target_gid is None:
         raise RuntimeError('If either of target uid/gid is present both are required')
 
     unshare(namespaces)
-    single_id_map('uid', target_uid, uid)
-    single_id_map('gid', target_gid, gid)
+    if idmap_helper:
+        try:
+            idmap_helper.wait()
+        except subprocess.CalledProcessError:
+            logger.warning('UID/GID helper failed to run, mapping root directly')
+            target_uid, target_gid = 0, 0
+
+    if target_uid is not None:
+        single_id_map('uid', target_uid, uid)
+        single_id_map('gid', target_gid, gid)
     return target_uid, target_gid
 
 
