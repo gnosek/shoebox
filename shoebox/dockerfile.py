@@ -504,13 +504,13 @@ def from_docker_metadata(meta_json):
         user=config['User'] or 'root',
         workdir=config['WorkingDir'] or '/')
 
-    def split_port(p):
-        port, proto = p.split('/', 1)
+    def split_port(port_str):
+        port, proto = port_str.split('/', 1)
         port = int(port)
         return port, proto
 
     if config['ExposedPorts']:
-        ports = set(split_port(p) for port in config['ExposedPorts'].keys())
+        ports = set(split_port(port) for port in config['ExposedPorts'].keys())
     else:
         ports = set()
 
