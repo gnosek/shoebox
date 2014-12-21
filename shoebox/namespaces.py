@@ -94,6 +94,8 @@ def create_userns(target_uid=None, target_gid=None):
         target_uid = 0
         target_gid = 0
 
+    uid, gid = os.getuid(), os.getgid()
+
     if target_uid is None and target_gid is None:
         pid = os.fork()
         rd, wr = os.pipe()
@@ -107,7 +109,6 @@ def create_userns(target_uid=None, target_gid=None):
             finally:
                 os._exit(exitcode)
         else:
-            uid, gid = os.getuid(), os.getgid()
             os.close(rd)
             unshare(CLONE_NEWUSER)
             os.close(wr)
@@ -119,8 +120,6 @@ def create_userns(target_uid=None, target_gid=None):
             return 0, 0
     elif target_uid is None or target_gid is None:
         raise RuntimeError('If either of target uid/gid is present both are required')
-
-    uid, gid = os.getuid(), os.getgid()
 
     unshare(CLONE_NEWUSER)
     single_id_map('uid', target_uid, uid)
