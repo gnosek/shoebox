@@ -16,6 +16,36 @@ from shoebox.namespaces import ContainerNamespace
 logger = logging.getLogger('shoebox.tar')
 
 
+TARBALL_EXTENSIONS = {
+    '.tar': 'uncompressed',
+    '.tar.gz': 'gzip',
+    '.tgz': 'gzip',
+    '.tar.bz2': 'bzip2',
+    '.tbz': 'bzip2',
+    '.tar.xz': 'xz',
+    '.txz': 'xz',
+}
+
+
+def detect_tar_format(path):
+    """Check if this is a tar archive and detect compression method
+
+    Docker detects compression by magic numbers (which is sane)
+    but otherwise bashes everything through tar (which is completely
+    deranged). Rather than duplicate this idiocy, simply compare
+    extensions to a predefined list.
+
+    At least we're not extracting gem files.
+    """
+
+    if not os.path.isfile(path):
+        return False
+
+    for ext, format in TARBALL_EXTENSIONS.items():
+        if path.endswith(ext):
+            return format
+
+
 class ContainerTarFile(tarfile.TarFile):
     def gettarinfo(self, name=None, arcname=None, fileobj=None):
         tarinfo = super(ContainerTarFile, self).gettarinfo(name, arcname, fileobj)

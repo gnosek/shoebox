@@ -4,7 +4,7 @@ import logging
 
 import os
 
-from shoebox.tar import CopyFiles, DownloadFiles
+from shoebox.tar import CopyFiles, DownloadFiles, detect_tar_format, ExtractTarFile
 
 
 logger = logging.getLogger('shoebox.exec_commands')
@@ -93,23 +93,40 @@ class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
 
 
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
+
+    def src_type(self, path):
+        if path.startswith('http://') or path.startswith('https://'):
+            return 'url'
+
+        if detect_tar_format(path):
+            return 'tar'
+
+        return 'file'
+
+    def handle_item(self, namespace, basedir, path):
+        item_type = self.src_type(path)
+        if item_type == 'url':
+            basedir = basedir or '.'
+            logger.info('Downloading {0} -> {1}'.format(path, self.dst_path))
+            DownloadFiles(namespace, self.dst_path, basedir, [path]).run()
+        elif item_type == 'tar':
+            if not basedir:
+                logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(path, self.dst_path))
+            logger.info('Extracting {0} -> {1}'.format(path, self.dst_path))
+            ExtractTarFile(namespace, self.dst_path, path).run()
+        else:
+            logger.info('Copying {0} -> {1}'.format(path, self.dst_path))
+            CopyFiles(namespace, self.dst_path, basedir, [path]).run()
+
     def execute(self, exec_context):
-        files = []
-        urls = []
-
-        for src in self.src_paths:
-            if src.startswith('http://') or src.startswith('https://'):
-                urls.append(src)
-            else:
-                files.append(src)
-
-        if urls:
-            DownloadFiles(exec_context.namespace, self.dst_path, exec_context.basedir or '.', urls).run()
-
-        if files:
+        if all(self.src_type(src) == 'file' for src in self.src_paths):
+            # no urls or archives, copy them in one go
             if exec_context.basedir is None:
-                logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(files, self.dst_path))
+                logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(self.src_paths, self.dst_path))
                 return
-            logger.info('ADD {0} -> {1}'.format(files, self.dst_path))
-            # TODO: unpack archives (even though it's kind of dumb)
-            CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, files).run()
+            logger.info('Copying {0} -> {1}'.format(self.src_paths, self.dst_path))
+            CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
+        else:
+            # slow path, handle one item at a time
+            for src in self.src_paths:
+                self.handle_item(exec_context.namespace, exec_context.basedir, src)
