@@ -191,7 +191,7 @@ class ExtractNamespacedTar(ExtractTarBase):
 
     def src_namespace(self):
         fs = FilesystemNamespace(self.src_dir)
-        return ContainerNamespace(fs, self.namespace.userns)
+        return ContainerNamespace(fs, self.namespace.user_namespace)
 
     def child_setup(self):
         os.close(self.wpipe)
