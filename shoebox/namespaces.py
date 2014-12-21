@@ -148,18 +148,6 @@ def pivot_root(new_root, old_root):
         raise OSError('Failed to pivot root {0} -> {1}'.format(new_root, old_root))
 
 
-def unmount_subtree(tree):
-    if os.path.exists('/proc/mounts'):
-        with open('/proc/mounts', 'r') as mounts:
-            for line in reversed(list(mounts)):
-                mnt = line.split()
-                mountpoint = mnt[1]
-                if mountpoint == tree or mountpoint.startswith(tree + '/'):
-                    libc.umount2(mnt[1], MNT_DETACH)
-    else:
-        libc.umount2(tree, MNT_DETACH)
-
-
 def makedev(target_dir_func, name):
     target = target_dir_func(name)
     if not os.path.exists(target):
@@ -265,7 +253,7 @@ def pivot_namespace_root(target):
     pivot_root(target, old_root)
     os.chdir('/')
     pivoted_old_root = '/' + os.path.basename(old_root)
-    unmount_subtree(pivoted_old_root)
+    libc.umount2(pivoted_old_root, MNT_DETACH)
     os.rmdir(pivoted_old_root)
 
 
