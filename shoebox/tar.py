@@ -9,6 +9,7 @@ import time
 
 import os
 import requests
+import subprocess
 
 from shoebox.namespaces import ContainerNamespace
 
@@ -214,13 +215,24 @@ class UnpackArchive(ExtractNamespacedTar):
         self.archive_path = archive_path
 
     def build_tar_archive(self, archive):
+        format = detect_tar_format(self.archive_path)
+        tar_pipe = archive
+        xz = None
+        if format == 'xz':
+            logger.info('Unpacking xz archive {0}'.format(self.archive_path))
+            xz = subprocess.Popen(['xzcat'], stdin=subprocess.PIPE, stdout=archive)
+            tar_pipe = xz.stdin
+
         def tar_read():
             tar = open(self.archive_path)
-            shutil.copyfileobj(tar, archive)
-            archive.close()
+            shutil.copyfileobj(tar, tar_pipe)
+            tar_pipe.close()
+            if archive is not tar_pipe:
+                archive.close()
 
         self.src_namespace().run(tar_read)
-
+        if xz:
+            xz.wait()
 
 class CopyFiles(ExtractNamespacedTar):
     def __init__(self, namespace, dest_dir, src_dir, members):
