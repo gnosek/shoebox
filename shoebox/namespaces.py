@@ -89,6 +89,8 @@ def create_userns(target_uid=None, target_gid=None):
     uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
     gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
 
+    namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
+
     if not uid_map or not gid_map:
         logger.warning('No mapping found for current user in /etc/subuid or /etc/subgid, mapping root directly')
         target_uid = 0
@@ -110,7 +112,7 @@ def create_userns(target_uid=None, target_gid=None):
                 os._exit(exitcode)
         else:
             os.close(rd)
-            unshare(CLONE_NEWUSER)
+            unshare(namespaces)
             os.close(wr)
             _, ret = os.waitpid(pid, 0)
             if ret != 0:
@@ -121,7 +123,7 @@ def create_userns(target_uid=None, target_gid=None):
     elif target_uid is None or target_gid is None:
         raise RuntimeError('If either of target uid/gid is present both are required')
 
-    unshare(CLONE_NEWUSER)
+    unshare(namespaces)
     single_id_map('uid', target_uid, uid)
     single_id_map('gid', target_gid, gid)
     return target_uid, target_gid
@@ -257,7 +259,6 @@ def pivot_namespace_root(target):
 
 
 def create_namespaces(target, layers, volumes, special_fs=True, is_root=True):
-    unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID)
     pid = os.fork()
     if pid:
         _, ret = os.waitpid(pid, 0)
