@@ -26,7 +26,8 @@ def unshare(flags):
 
 
 def sethostname(hostname):
-    if libc.sethostname(hostname) != 0:
+    h = hostname.encode('utf-8')
+    if libc.sethostname(h, len(h)) != 0:
         # errno gets clobbered so that's all we know
         raise OSError('Failed to sethostname {0}'.format(hostname))
 
@@ -39,7 +40,7 @@ class ContainerNamespace(object):
         else:
             self.user_namespace = user_namespace
         self.private_net = private_net
-        self.hostname = None
+        self.hostname = hostname
 
     def __repr__(self):
         return 'FS: {0!r}, USER: {1!r}, NET: {2!r}'.format(self.filesystem, self.user_namespace, self.private_net)
