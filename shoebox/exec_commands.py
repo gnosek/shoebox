@@ -88,6 +88,8 @@ class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
         if exec_context.basedir is None:
             logger.warning('Skipping COPY {0} -> {1} -- no base directory'.format(self.src_paths, self.dst_path))
             return
+        if len(self.src_paths) > 1 and not self.dst_path.endswith('/'):
+            raise RuntimeError('With multiple source files target must be a directory (end with /)')
         logger.info('COPY {0} -> {1}'.format(self.src_paths, self.dst_path))
         CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
 
@@ -118,6 +120,8 @@ class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
             CopyFiles(namespace, self.dst_path, basedir, [path]).run()
 
     def execute(self, exec_context):
+        if len(self.src_paths) > 1 and not self.dst_path.endswith('/'):
+            raise RuntimeError('With multiple source files target must be a directory (end with /)')
         if all(self.src_type(src) == 'file' for src in self.src_paths):
             # no urls or archives, copy them in one go
             if exec_context.basedir is None:

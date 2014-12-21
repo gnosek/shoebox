@@ -237,16 +237,23 @@ class UnpackArchive(ExtractNamespacedTar):
                 xz.stdin.close()
                 xz.wait()
 
+
 class CopyFiles(ExtractNamespacedTar):
     def __init__(self, namespace, dest_dir, src_dir, members):
+        dest_dir, target_basename = os.path.split(dest_dir)
+        if target_basename:
+            assert len(members) == 1
+        else:
+            target_basename = None  # '' by default
         super(CopyFiles, self).__init__(namespace, dest_dir, src_dir)
         self.members = members
+        self.target_basename = target_basename
 
     def add(self, tar, member):
         if os.path.isdir(member):
             tar.add(member, arcname='.')
         else:
-            tar.add(member)
+            tar.add(member, arcname=self.target_basename)
 
     def build_tar_archive(self, archive):
         tar = ContainerTarFile.open(fileobj=archive, mode='w|')
@@ -266,7 +273,10 @@ class DownloadFiles(CopyFiles):
         response = requests.get(member, stream=True)
         response.raise_for_status()
         parsed = urlparse.urlparse(member)
-        basename = os.path.basename(parsed.path.rstrip('/'))
+        if self.target_basename:
+            basename = self.target_basename
+        else:
+            basename = os.path.basename(parsed.path.rstrip('/'))
         tarinfo = tarfile.TarInfo(name=basename)
         try:
             size = int(response.headers['Content-Length'])
