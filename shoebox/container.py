@@ -42,9 +42,9 @@ class Container(object):
             volumes.append((target, vol))
         return volumes
 
-    def namespace(self, target_uid, target_gid, special_fs=True):
+    def namespace(self, target_uid, target_gid, private_net):
         layers = [self.target_base, self.target_delta]
-        return ContainerNamespace(self.target_root, layers, self.volumes(), target_uid, target_gid, special_fs)
+        return ContainerNamespace(self.target_root, layers, self.volumes(), target_uid, target_gid, True, private_net)
 
     def build_namespace(self, target_uid, target_gid):
         return ContainerNamespace(self.target_base, None, None, target_uid, target_gid, special_fs=False)

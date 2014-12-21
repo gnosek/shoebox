@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from ctypes import CDLL
 import getpass
 import itertools
@@ -6,6 +7,7 @@ import collections
 import stat
 import subprocess
 import tempfile
+import pyroute2
 
 import os
 
@@ -86,6 +88,41 @@ def single_id_map(map_name, id_inside, id_outside):
         print >> fp, '{0} {1} 1'.format(id_inside, id_outside)
 
 
+class PrivateNetwork(object):
+    def __init__(self, bridge, ip_address, gateway, dev_type='veth'):
+        self.bridge = bridge
+        if ip_address:
+            self.ip_address, prefixlen = ip_address.split('/', 1)
+            self.prefixlen = int(prefixlen)
+        else:
+            self.ip_address = None
+            self.prefixlen = None
+        self.gateway = gateway
+        self.dev_type = dev_type
+
+    def init_net_interface(self, pid):
+        subprocess.check_output(['/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic', str(pid), self.dev_type, self.bridge])
+
+    def set_ip_address(self):
+        iproute = pyroute2.IPRoute()
+        loopback = iproute.link_lookup(ifname='lo')[0]
+        eth0 = iproute.link_lookup(ifname='eth0')[0]
+        iproute.link('set', index=loopback, state='up')
+        iproute.link('set', index=eth0, state='up')
+        if self.ip_address:
+            iproute.addr('add', index=eth0, address=self.ip_address, mask=self.prefixlen)
+            if self.gateway:
+                iproute.route('add', dst='0.0.0.0', mask=0, gateway=self.gateway)
+
+    @contextmanager
+    def setup_netns(self):
+        netns_helper = spawn_helper('netns', self.init_net_interface, os.getpid())
+
+        yield
+
+        netns_helper.wait()
+        self.set_ip_address()
+
 class Helper(collections.namedtuple('Helper', 'name pid wr_pipe')):
 
     def wait(self):
@@ -99,7 +136,7 @@ class Helper(collections.namedtuple('Helper', 'name pid wr_pipe')):
             raise subprocess.CalledProcessError(cmd=self.name, returncode=exitcode)
 
 
-def spawn_helper(func, *args, **kwargs):
+def spawn_helper(name, func, *args, **kwargs):
     rd, wr = os.pipe()
     pid = os.fork()
     if pid == 0:  # child
@@ -113,29 +150,29 @@ def spawn_helper(func, *args, **kwargs):
             os._exit(exitcode)
     else:
         os.close(rd)
-        return Helper('idmap', pid, wr)
+        return Helper(name, pid, wr)
 
 
-def create_userns(target_uid=None, target_gid=None):
+@contextmanager
+def setup_userns(ugid_dict, target_uid=None, target_gid=None):
     uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
     gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
-
-    namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
+    uid, gid = os.getuid(), os.getgid()
 
     if not uid_map or not gid_map:
         logger.warning('No mapping found for current user in /etc/subuid or /etc/subgid, mapping root directly')
         target_uid = 0
         target_gid = 0
 
-    uid, gid = os.getuid(), os.getgid()
     idmap_helper = None
 
     if target_uid is None and target_gid is None:
-        idmap_helper = spawn_helper(apply_id_maps, os.getppid(), uid_map, gid_map)
+        idmap_helper = spawn_helper('idmap', apply_id_maps, os.getpid(), uid_map, gid_map)
     elif target_uid is None or target_gid is None:
         raise RuntimeError('If either of target uid/gid is present both are required')
 
-    unshare(namespaces)
+    yield
+
     if idmap_helper:
         try:
             idmap_helper.wait()
@@ -146,7 +183,9 @@ def create_userns(target_uid=None, target_gid=None):
     if target_uid is not None:
         single_id_map('uid', target_uid, uid)
         single_id_map('gid', target_gid, gid)
-    return target_uid, target_gid
+
+    ugid_dict['uid'] = target_uid
+    ugid_dict['gid'] = target_gid
 
 
 def mount(device, target, fstype, flags, options):
@@ -306,41 +345,53 @@ def create_namespaces(target, layers, volumes, special_fs=True, is_root=True):
     pivot_namespace_root(target)
 
 
-def build_container_namespace(runtime_dir, layers, volumes=None, target_uid=None, target_gid=None, special_fs=True):
-    if not os.path.exists(runtime_dir):
-        if layers:
-            os.makedirs(runtime_dir)
-        else:
-            raise RuntimeError('{0} does not exist'.format(runtime_dir))
-
-    target_uid, target_gid = create_userns(target_uid, target_gid)
-    is_root = (target_uid == 0 and target_gid == 0)
-
-    create_namespaces(runtime_dir, layers, volumes, special_fs, is_root)
-    drop_caps()
-    os.seteuid(target_uid)
-    os.setegid(target_gid)
-    os.setuid(target_uid)
-    os.setgid(target_gid)
-    os.setgroups([target_gid])
-
-
 class ContainerNamespace(object):
-    def __init__(self, target, layers, volumes=None, target_uid=None, target_gid=None, special_fs=True):
+    def __init__(self, target, layers, volumes=None, target_uid=None, target_gid=None, special_fs=True,
+                 private_net=None):
         self.target = target
         self.layers = layers
         self.volumes = volumes
         self.target_uid = target_uid
         self.target_gid = target_gid
         self.special_fs = special_fs
+        self.private_net = private_net
 
     def __repr__(self):
         return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(
             id=id(self), **self.__dict__)
 
+    def create_userns(self):
+        namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
+
+        ugid_dict = {}
+        with setup_userns(ugid_dict, self.target_uid, self.target_gid):
+            if self.private_net:
+                namespaces |= CLONE_NEWNET
+                with self.private_net.setup_netns():
+                    unshare(namespaces)
+            else:
+                unshare(namespaces)
+
+        return ugid_dict['uid'], ugid_dict['gid']
+
+
     def build(self):
-        build_container_namespace(
-            self.target, self.layers, self.volumes, self.target_uid, self.target_gid, self.special_fs)
+        if not os.path.exists(self.target):
+            if self.layers:
+                os.makedirs(self.target)
+            else:
+                raise RuntimeError('{0} does not exist'.format(self.target))
+
+        target_uid, target_gid = self.create_userns()
+        is_root = (target_uid == 0 and target_gid == 0)
+
+        create_namespaces(self.target, self.layers, self.volumes, self.special_fs, is_root)
+        drop_caps()
+        os.seteuid(target_uid)
+        os.setegid(target_gid)
+        os.setuid(target_uid)
+        os.setgid(target_gid)
+        os.setgroups([target_gid])
 
     def execns(self, ns_func, *args, **kwargs):
         exitcode = 1
