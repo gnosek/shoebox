@@ -51,7 +51,7 @@ def remove_container(shoebox_dir, container_id, volumes=False, target_uid=None, 
 
 
 @click.command()
-@click.argument('container_id')
+@click.argument('container_id', nargs=-1)
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
@@ -60,4 +60,5 @@ def cli(container_id, shoebox_dir, target_uid=None, target_gid=None, volumes=Fal
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
-    remove_container(shoebox_dir, container_id, volumes, target_uid, target_gid)
+    for container in container_id:
+        remove_container(shoebox_dir, container, volumes, target_uid, target_gid)
