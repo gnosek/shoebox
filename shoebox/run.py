@@ -50,12 +50,12 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     from_image = kwargs.pop('from', None)
     if from_image is None:
-        container = Container(shoebox_dir, container_id)
-        container.load_metadata()
-    else:
         if container_id is None:
             logging.error('Either container_id or --from image is required')
             os._exit(1)
+        container = Container(shoebox_dir, container_id)
+        container.load_metadata()
+    else:
         storage_dir = os.path.join(shoebox_dir, 'images')
         repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
         try:
