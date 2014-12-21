@@ -249,6 +249,8 @@ def mount_etc_files(target_dir_func):
         with open(tmpfile, 'w') as fp:
             fp.write(content)
         target = target_dir_func(path)
+        if not os.path.exists(target):
+            open(target, 'w').close()
         bind_mount(tmpfile.encode('utf-8'), target.encode('utf-8'))
     libc.umount2(tmpfs.encode('utf-8'), MNT_DETACH)
     os.rmdir(tmpfs)
