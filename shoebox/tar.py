@@ -224,15 +224,18 @@ class UnpackArchive(ExtractNamespacedTar):
             tar_pipe = xz.stdin
 
         def tar_read():
+            if archive is not tar_pipe:
+                archive.close()
             tar = open(self.archive_path)
             shutil.copyfileobj(tar, tar_pipe)
             tar_pipe.close()
-            if archive is not tar_pipe:
-                archive.close()
 
-        self.src_namespace().run(tar_read)
-        if xz:
-            xz.wait()
+        try:
+            self.src_namespace().run(tar_read)
+        finally:
+            if xz:
+                xz.stdin.close()
+                xz.wait()
 
 class CopyFiles(ExtractNamespacedTar):
     def __init__(self, namespace, dest_dir, src_dir, members):
