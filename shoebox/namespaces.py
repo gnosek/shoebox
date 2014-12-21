@@ -179,13 +179,15 @@ def setup_userns(ugid_dict, target_uid=None, target_gid=None):
         except subprocess.CalledProcessError:
             logger.warning('UID/GID helper failed to run, mapping root directly')
             target_uid, target_gid = 0, 0
+        else:
+            ugid_dict['uid'] = 0
+            ugid_dict['gid'] = 0
 
     if target_uid is not None:
         single_id_map('uid', target_uid, uid)
         single_id_map('gid', target_gid, gid)
-
-    ugid_dict['uid'] = target_uid
-    ugid_dict['gid'] = target_gid
+        ugid_dict['uid'] = target_uid
+        ugid_dict['gid'] = target_gid
 
 
 def mount(device, target, fstype, flags, options):
