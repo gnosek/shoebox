@@ -93,10 +93,13 @@ def mount_devices(target_dir_func):
     if not os.path.exists(devpts):
         os.makedirs(devpts, mode=0o755)
 
-    mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'newinstance,ptmxmode=0666')
+    try:
+        mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NOSUID, 'newinstance,gid=5,mode=0620,ptmxmode=0666')
+    except OSError:
+        mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NOSUID, 'newinstance,mode=0620,ptmxmode=0666')
     if not os.path.exists(ptmx):
         os.symlink('pts/ptmx', ptmx)
-    else:
+    elif not os.path.islink(ptmx):
         bind_mount(os.path.join(devpts, 'ptmx').encode('utf-8'), ptmx.encode('utf-8'))
 
     devshm = target_dir_func('/dev/shm')
