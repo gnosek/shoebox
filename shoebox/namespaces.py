@@ -2,6 +2,7 @@ from ctypes import CDLL
 import getpass
 import itertools
 import logging
+import stat
 import subprocess
 import tempfile
 
@@ -164,7 +165,9 @@ def makedev(target_dir_func, name):
     if not os.path.exists(target):
         with open(target, 'w') as fp:
             print >> fp, 'Dummy file to be overmounted by shoebox run'
-    elif True:  # TODO: if not device
+
+    s = os.stat(target)
+    if not s.st_mode & (stat.S_IFBLK | stat.S_IFCHR):
         bind_mount(name.encode('utf-8'), target.encode('utf-8'))
 
 
