@@ -70,8 +70,10 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     if workdir:
         context = context._replace(workdir=workdir)
 
-    if rm:
+    container.write_pidfile()
+    try:
         namespace.run(exec_in_namespace, context, command)
-        remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
-    else:
-        namespace.execns(exec_in_namespace, context, command)
+        if rm:
+            remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
+    finally:
+        container.unlink_pidfile()

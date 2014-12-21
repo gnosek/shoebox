@@ -20,6 +20,7 @@ class Container(object):
         self.target_delta = os.path.join(self.runtime_dir, 'delta')
         self.target_root = os.path.join(self.runtime_dir, 'root')
         self.volume_root = os.path.join(self.runtime_dir, 'volumes')
+        self.pidfile = os.path.join(self.runtime_dir, 'pid')
         self.metadata = None
 
     def load_metadata(self):
@@ -47,3 +48,17 @@ class Container(object):
 
     def build_namespace(self, target_uid, target_gid):
         return ContainerNamespace(self.target_base, None, None, target_uid, target_gid, special_fs=False)
+
+    def write_pidfile(self):
+        with open(self.pidfile, 'w') as fp:
+            print >> fp, os.getpid()
+
+    def unlink_pidfile(self):
+        if os.path.exists(self.pidfile):
+            os.unlink(self.pidfile)
+
+    def pid(self):
+        try:
+            return int(open(self.pidfile).read())
+        except (IOError, ValueError):
+            return
