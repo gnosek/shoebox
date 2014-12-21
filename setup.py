@@ -17,6 +17,9 @@ setup(
         shoebox-run=shoebox.run:run
         shoebox-rm=shoebox.rm:cli
 
+        shoebox-ls=shoebox.utils:ls
+        shoebox-ps=shoebox.utils:ps
+
         shoebox-ancestry=shoebox.pull:ancestry
         shoebox-metadata=shoebox.pull:get_metadata
     ''',
