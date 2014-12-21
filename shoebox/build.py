@@ -46,6 +46,6 @@ def cli(base_dir, shoebox_dir, index_url, force, target_uid, target_gid):
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
 
     dockerfile = parse_dockerfile(open(dockerfile_path).read(), repo=repo)
-    container = build('.', force, dockerfile, repo, shoebox_dir, target_gid, target_uid)
+    container = build(os.getcwd(), force, dockerfile, repo, shoebox_dir, target_gid, target_uid)
 
     print container.container_id

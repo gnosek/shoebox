@@ -105,7 +105,7 @@ class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def handle_item(self, namespace, basedir, path):
         item_type = self.src_type(path)
         if item_type == 'url':
-            basedir = basedir or '.'
+            basedir = basedir or os.getcwd()
             logger.info('Downloading {0} -> {1}'.format(path, self.dst_path))
             DownloadFiles(namespace, self.dst_path, basedir, [path]).run()
         elif item_type == 'tar':
