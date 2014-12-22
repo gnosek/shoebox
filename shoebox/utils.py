@@ -20,7 +20,11 @@ def ps(shoebox_dir):
     container_dir = os.path.join(shoebox_dir, 'containers')
     for container_id in os.listdir(container_dir):
         container = Container(shoebox_dir, container_id)
-        print container_id
+        ip = container.ip_address()
+        if ip:
+            print container_id, ip
+        else:
+            print container_id
         pid = container.pid()
         if pid:
             subprocess.check_call(['pstree', '-ap', str(pid)])

@@ -79,9 +79,11 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         context = context._replace(workdir=workdir)
 
     container.write_pidfile()
+    if private_net and private_net.ip_address:
+        container.write_ip_address(private_net.ip_address)
     try:
         namespace.run(exec_in_namespace, context, command)
         if rm:
             remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
     finally:
-        container.unlink_pidfile()
+        container.cleanup_runtime_files()

@@ -21,6 +21,7 @@ class Container(object):
         self.target_root = os.path.join(self.runtime_dir, 'root')
         self.volume_root = os.path.join(self.runtime_dir, 'volumes')
         self.pidfile = os.path.join(self.runtime_dir, 'pid')
+        self.ip_address_file = os.path.join(self.runtime_dir, 'ip_address')
         self.metadata = None
 
     def load_metadata(self):
@@ -53,12 +54,24 @@ class Container(object):
         with open(self.pidfile, 'w') as fp:
             print >> fp, os.getpid()
 
-    def unlink_pidfile(self):
-        if os.path.exists(self.pidfile):
-            os.unlink(self.pidfile)
-
     def pid(self):
         try:
             return int(open(self.pidfile).read())
         except (IOError, ValueError):
             return
+
+    def write_ip_address(self, ip):
+        with open(self.ip_address_file, 'w') as fp:
+            print >> fp, ip
+
+    def ip_address(self):
+        try:
+            return open(self.ip_address_file).read().strip()
+        except (IOError, ValueError):
+            return
+
+    def cleanup_runtime_files(self):
+        for p in (self.pidfile, self.ip_address_file):
+            if os.path.exists(p):
+                os.unlink(p)
+
