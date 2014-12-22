@@ -58,8 +58,21 @@ ff02::2 ip6-allrouters
             return '{0} {1}'.format(self.private_net.ip_address, self.hostname) + base_hosts
         return base_hosts
 
+    def etc_resolv_conf(self):
+        resolvconf = []
+        for line in open('/etc/resolv.conf'):
+            line = line.strip()
+            if line.startswith('nameserver'):
+                _, ns = line.split()
+                if ns.startswith('127.') and self.private_net and self.private_net.ip_address:
+                    resolvconf.append('nameserver {0}'.format(self.private_net.gateway))
+                    continue
+            resolvconf.append(line)
+        return '\n'.join(resolvconf)
+
     def build(self):
         self.filesystem.check_root_dir()
+        resolvconf = self.etc_resolv_conf()
 
         with self.user_namespace.setup_userns():
             namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
@@ -76,6 +89,10 @@ ff02::2 ip6-allrouters
         self.filesystem.build()
         with open('/etc/hosts', 'w') as hosts:
             print >> hosts, self.etc_hosts()
+
+        with open('/etc/resolv.conf', 'w') as resolv:
+            print >> resolv, resolvconf
+
         drop_caps()
         os.setgroups([os.getgid()])
 
