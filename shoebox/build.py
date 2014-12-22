@@ -1,8 +1,7 @@
 import logging
+import os
 
 import click
-
-import os
 
 from shoebox.container import Container
 from shoebox.dockerfile import parse_dockerfile, ExecContext
@@ -18,6 +17,7 @@ def build(base_dir, force, dockerfile, repo, shoebox_dir, userns):
     container_id = os.urandom(32).encode('hex')
     container = Container(shoebox_dir, container_id)
     repo.unpack(container.target_base, dockerfile.base_image_id, force)
+    dockerfile = dockerfile._replace(hostname='h' + container_id[:8])
     container.save_metadata(dockerfile)
 
     namespace = ContainerNamespace(container.build_filesystem(), userns)

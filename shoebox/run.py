@@ -62,7 +62,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         metadata = metadata._replace(run_commands=[])
         container = build(None, force, metadata, repo, shoebox_dir, userns)
 
-    namespace = ContainerNamespace(container.filesystem(), userns, private_net)
+    namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname)
 
     if entrypoint is None:
         entrypoint = container.metadata.entrypoint or []

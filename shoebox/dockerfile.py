@@ -12,7 +12,7 @@ RunContext = namedtuple('RunContext', 'environ user workdir')
 ExecContext = namedtuple('ExecContext', 'namespace basedir')
 
 Dockerfile = namedtuple(
-    'Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo onbuild')
+    'Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo onbuild hostname')
 
 eol = p.LineEnd().suppress()
 sp = p.White().suppress()
@@ -475,6 +475,7 @@ def empty_dockerfile(repo):
         command=None,
         repo=repo,
         onbuild=[],
+        hostname=None,
     )
     return base_dockerfile
 
@@ -523,6 +524,7 @@ def from_docker_metadata(meta_json):
         command=config['Cmd'],
         repo=None,
         onbuild=onbuild,
+        hostname=config['Hostname'],
     )
     return dockerfile
 
@@ -558,7 +560,7 @@ def to_docker_metadata(container_id, dockerfile):
 
     config = {
         'Env': ['='.join(kv) for kv in dockerfile.context.environ.items()],
-        'Hostname': 'h' + container_id[:8],
+        'Hostname': dockerfile.hostname,
         'Entrypoint': dockerfile.entrypoint,
         'PortSpecs': None,
         'Memory': 0,

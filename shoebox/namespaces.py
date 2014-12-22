@@ -25,14 +25,21 @@ def unshare(flags):
         raise OSError('Failed to unshare {0:x}'.format(flags))
 
 
+def sethostname(hostname):
+    if libc.sethostname(hostname) != 0:
+        # errno gets clobbered so that's all we know
+        raise OSError('Failed to sethostname {0}'.format(hostname))
+
+
 class ContainerNamespace(object):
-    def __init__(self, filesystem, user_namespace=None, private_net=None):
+    def __init__(self, filesystem, user_namespace=None, private_net=None, hostname=None):
         self.filesystem = filesystem
         if user_namespace is None:
             self.user_namespace = UserNamespace(None, None)
         else:
             self.user_namespace = user_namespace
         self.private_net = private_net
+        self.hostname = None
 
     def __repr__(self):
         return 'FS: {0!r}, USER: {1!r}, NET: {2!r}'.format(self.filesystem, self.user_namespace, self.private_net)
@@ -47,6 +54,9 @@ class ContainerNamespace(object):
                     unshare(namespaces)
             else:
                 unshare(namespaces)
+
+        if self.hostname:
+            sethostname(self.hostname)
 
     def build(self):
         self.filesystem.check_root_dir()
