@@ -71,10 +71,13 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     links = []
     if link is not None:
-        for l in link:
-            source, alias = l.split(':', 1)
-            link_ct = Container(shoebox_dir, source)
-            links.append(ContainerLink(link_ct, alias))
+        if private_net and ip:
+            for l in link:
+                source, alias = l.split(':', 1)
+                link_ct = Container(shoebox_dir, source)
+                links.append(ContainerLink(link_ct, alias))
+        else:
+            logging.warning('Ignoring container links when running without private networking')
 
     namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname, links=links)
 
