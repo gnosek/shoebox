@@ -82,6 +82,12 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     if workdir:
         context = context._replace(workdir=workdir)
 
+    environ = context.environ
+    if 'TERM' in os.environ:
+        environ['TERM'] = os.environ['TERM']
+    if 'LANG' in os.environ:
+        environ['LANG'] = os.environ['LANG']
+
     container.write_pidfile()
     if private_net and private_net.ip_address:
         container.write_ip_address(private_net.ip_address)
