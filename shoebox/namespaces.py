@@ -1,3 +1,4 @@
+from socket import AF_INET
 from contextlib import contextmanager
 from ctypes import CDLL
 import getpass
@@ -89,16 +90,39 @@ def single_id_map(map_name, id_inside, id_outside):
 
 
 class PrivateNetwork(object):
-    def __init__(self, bridge, ip_address, gateway, dev_type='veth'):
+    def __init__(self, bridge, ip_address, dev_type='veth'):
+        if bridge == 'auto':
+            bridge, dev_type = self.detect_bridge()
         self.bridge = bridge
-        if ip_address:
-            self.ip_address, prefixlen = ip_address.split('/', 1)
-            self.prefixlen = int(prefixlen)
-        else:
-            self.ip_address = None
-            self.prefixlen = None
-        self.gateway = gateway
+        self.ip_address = ip_address
+        self.gateway, self.prefixlen = self.gateway_settings()
         self.dev_type = dev_type
+
+    def detect_bridge(self):
+        username = getpass.getuser()
+        with open('/etc/lxc/lxc-usernet') as usernet:
+            for line in usernet:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                user, dev_type, bridge, count = line.split()
+                if user != username:
+                    continue
+                return bridge, dev_type
+        return None, None
+
+    def gateway_settings(self):
+        """return ip/mask of bridge to use as default gateway"""
+        iproute = pyroute2.IPRoute()
+        bridge = iproute.link_lookup(ifname=self.bridge)[0]
+        gateway = None
+        for addr in iproute.get_addr(AF_INET):
+            if addr['index'] != bridge:
+                continue
+            for name, value in addr['attrs']:
+                if name == 'IFA_ADDRESS':
+                    gateway = value
+            return gateway, addr['prefixlen']
 
     def init_net_interface(self, pid):
         subprocess.check_output(['/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic', str(pid), self.dev_type, self.bridge])
@@ -116,12 +140,16 @@ class PrivateNetwork(object):
 
     @contextmanager
     def setup_netns(self):
-        netns_helper = spawn_helper('netns', self.init_net_interface, os.getpid())
+        if self.bridge:
+            netns_helper = spawn_helper('netns', self.init_net_interface, os.getpid())
+        else:
+            netns_helper = None  # make PyCharm happy
 
         yield
 
-        netns_helper.wait()
-        self.set_ip_address()
+        if self.bridge:
+            netns_helper.wait()
+            self.set_ip_address()
 
 class Helper(collections.namedtuple('Helper', 'name pid wr_pipe')):
 
