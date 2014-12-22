@@ -57,6 +57,9 @@ class UserNamespace(object):
         self.target_uid = target_uid
         self.target_gid = target_gid
 
+    def __repr__(self):
+        return 'uid:{0} gid:{1}'.format(self.target_uid, self.target_gid)
+
     @contextmanager
     def setup_userns(self):
         uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))

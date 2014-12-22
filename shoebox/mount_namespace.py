@@ -160,6 +160,9 @@ class FilesystemNamespace(object):
         self.volumes = volumes
         self.special_fs = special_fs
 
+    def __repr__(self):
+        return '{0} + {1} -> {2} (special_fs: {3})'.format(self.layers, self.volumes, self.target, self.special_fs)
+
     def target_subdir(self, path):
         return os.path.join(self.target, path.lstrip('/'))
 

@@ -16,6 +16,9 @@ class PrivateNetwork(object):
         self.gateway, self.prefixlen = self.gateway_settings()
         self.dev_type = dev_type
 
+    def __repr__(self):
+        return '{0}/{1} via {2}@{3}'.format(self.ip_address, self.prefixlen, self.gateway, self.bridge)
+
     def detect_bridge(self):
         username = getpass.getuser()
         with open('/etc/lxc/lxc-usernet') as usernet:

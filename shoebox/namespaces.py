@@ -34,9 +34,8 @@ class ContainerNamespace(object):
             self.user_namespace = user_namespace
         self.private_net = private_net
 
-    # def __repr__(self):
-    #     return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(
-    #         id=id(self), **self.__dict__)
+    def __repr__(self):
+        return 'FS: {0!r}, USER: {1!r}, NET: {2!r}'.format(self.filesystem, self.user_namespace, self.private_net)
 
     def create_userns(self):
         namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
