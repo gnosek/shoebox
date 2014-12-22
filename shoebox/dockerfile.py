@@ -560,7 +560,7 @@ def to_docker_metadata(container_id, dockerfile):
         volumes = None
 
     if dockerfile.expose:
-        ports = dict(('{0}/tcp'.format(port), {}) for port in sorted(dockerfile.expose))
+        ports = dict(('{0}/{1}'.format(*port), {}) for port in sorted(dockerfile.expose))
     else:
         ports = None
 
