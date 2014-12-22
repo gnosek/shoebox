@@ -21,6 +21,7 @@ from shoebox.user_namespace import UserNamespace
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
 @click.option('--from', help='create new container from image')
 @click.option('--entrypoint', help='override image entrypoint')
+@click.option('--env', '-e', multiple=True, help='extra environment variables')
 @click.option('--link', multiple=True, help='link containers')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
@@ -32,7 +33,7 @@ from shoebox.user_namespace import UserNamespace
 @click.option('--workdir', '-w', help='work directory')
 @click.option('--rm/--no-rm', help='remove container after exit')
 def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None,
-        target_gid=None, force=False, rm=False, bridge=None, ip=None, link=None, **kwargs):
+        target_gid=None, force=False, rm=False, bridge=None, ip=None, link=None, env=None, **kwargs):
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
@@ -107,6 +108,11 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     for l in links:
         environ.update(l.environ())
+
+    if env:
+        for var in env:
+            k, v = var.split('=', 1)
+            environ[k] = v
 
     container.write_pidfile()
     if private_net and private_net.ip_address:
