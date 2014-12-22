@@ -1,48 +1,13 @@
-from ctypes import CDLL
 import logging
 import os
 import socket
 import stat
 import tempfile
 
+from shoebox.libc import mount, bind_mount, pivot_root, MS_NOEXEC, MS_NOSUID, MS_NODEV, umount
 
-libc = CDLL('libc.so.6')
+
 logger = logging.getLogger('shoebox')
-
-
-# linux/fs.h
-MS_RDONLY = 1
-MS_NOSUID = 2
-MS_NODEV = 4
-MS_NOEXEC = 8
-MS_REMOUNT = 32
-MS_BIND = 4096
-MS_MOVE = 8192
-MS_REC = 16384
-MS_MGC_VAL = 0xC0ED0000
-
-# sys/mount.h
-MNT_DETACH = 2
-
-
-def mount(device, target, fstype, flags, options):
-    if libc.mount(device, target, fstype, flags | MS_MGC_VAL, options) < 0:
-        raise OSError('Failed to mount {0} at {1}'.format(device, target))
-
-
-def bind_mount(source, target, readonly=False, rec=False):
-    flags = MS_BIND | MS_MGC_VAL
-    if rec:
-        flags |= MS_REC
-    if readonly:
-        flags |= MS_RDONLY
-    if libc.mount(source, target, 'none', flags, None) < 0:
-        raise OSError('Failed to bind mount {0} at {1}'.format(source, target))
-
-
-def pivot_root(new_root, old_root):
-    if libc.pivot_root(new_root, old_root) < 0:
-        raise OSError('Failed to pivot root {0} -> {1}'.format(new_root, old_root))
 
 
 def makedev(target_dir_func, name):
@@ -53,12 +18,10 @@ def makedev(target_dir_func, name):
 
     s = os.stat(target)
     if not s.st_mode & (stat.S_IFBLK | stat.S_IFCHR):
-        bind_mount(name.encode('utf-8'), target.encode('utf-8'))
+        bind_mount(name, target)
 
 
 def mount_root_fs(target, overlayfs_layers):
-    target = target.encode('utf-8')
-
     if overlayfs_layers is None:
         overlayfs_layers = []
 
@@ -70,8 +33,6 @@ def mount_root_fs(target, overlayfs_layers):
             if not os.path.exists(layer):
                 os.makedirs(layer)
         lower, upper = overlayfs_layers
-        lower = lower.encode('utf-8')
-        upper = upper.encode('utf-8')
         mount('overlayfs', target, 'overlayfs', 0, 'lowerdir={0},upperdir={1}'.format(lower, upper))
     else:
         # make target a mount point, for pivot_root
@@ -83,7 +44,7 @@ def mount_volumes(target_dir_func, volumes):
         real_target = target_dir_func(volume_target)
         if not os.path.exists(real_target):
             os.makedirs(real_target, 0o755)
-        bind_mount(volume_source.encode('utf-8'), real_target.encode('utf-8'), rec=True)
+        bind_mount(volume_source, real_target, rec=True)
 
 
 def mount_devices(target_dir_func):
@@ -94,17 +55,17 @@ def mount_devices(target_dir_func):
         os.makedirs(devpts, mode=0o755)
 
     try:
-        mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NOSUID, 'newinstance,gid=5,mode=0620,ptmxmode=0666')
+        mount('devpts', devpts, 'devpts', MS_NOEXEC | MS_NOSUID, 'newinstance,gid=5,mode=0620,ptmxmode=0666')
     except OSError:
-        mount('devpts', devpts.encode('utf-8'), 'devpts', MS_NOEXEC | MS_NOSUID, 'newinstance,mode=0620,ptmxmode=0666')
+        mount('devpts', devpts, 'devpts', MS_NOEXEC | MS_NOSUID, 'newinstance,mode=0620,ptmxmode=0666')
     if not os.path.exists(ptmx):
         os.symlink('pts/ptmx', ptmx)
     elif not os.path.islink(ptmx):
-        bind_mount(os.path.join(devpts, 'ptmx').encode('utf-8'), ptmx.encode('utf-8'))
+        bind_mount(os.path.join(devpts, 'ptmx'), ptmx)
 
     devshm = target_dir_func('/dev/shm')
     if os.path.exists(devshm):
-        mount('devshm', devshm.encode('utf-8'), 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
+        mount('devshm', devshm, 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
 
     devices = ('null', 'zero', 'tty', 'random', 'urandom')
     for dev in devices:
@@ -115,15 +76,15 @@ def mount_procfs(target_dir_func):
     target_proc = target_dir_func('/proc')
     if not os.path.exists(target_proc):
         os.makedirs(target_proc, mode=0o755)
-    mount('proc', target_proc.encode('utf-8'), 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
+    mount('proc', target_proc, 'proc', MS_NOEXEC | MS_NODEV | MS_NOSUID, None)
     for path in ('sysrq-trigger', 'sys', 'irq', 'bus'):
-        abs_path = os.path.join(target_proc, path).encode('utf-8')
+        abs_path = os.path.join(target_proc, path)
         bind_mount(abs_path, abs_path)
         bind_mount(abs_path, abs_path, readonly=True)
 
 
 def mount_sysfs(target_dir_func):
-    target_sys = target_dir_func('/sys').encode('utf-8')
+    target_sys = target_dir_func('/sys')
     try:
         bind_mount('/sys', target_sys)
         bind_mount(target_sys, target_sys, readonly=True)
@@ -133,7 +94,7 @@ def mount_sysfs(target_dir_func):
 
 def mount_etc_files(target_dir_func):
     tmpfs = tempfile.mkdtemp(prefix='.etc', dir=target_dir_func('/'))
-    mount('tmpfs', tmpfs.encode('utf-8'), 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'size=1m')
+    mount('tmpfs', tmpfs, 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'size=1m')
 
     def write_and_mount_file(path, content):
         tmpfile = os.path.join(tmpfs, os.path.basename(path))
@@ -142,7 +103,7 @@ def mount_etc_files(target_dir_func):
         target = target_dir_func(path)
         if not os.path.exists(target):
             open(target, 'w').close()
-        bind_mount(tmpfile.encode('utf-8'), target.encode('utf-8'))
+        bind_mount(tmpfile, target)
 
     for path in ('/etc/resolv.conf', '/etc/hosts'):
         content = open(path).read()
@@ -150,17 +111,16 @@ def mount_etc_files(target_dir_func):
 
     write_and_mount_file('/etc/hostname', socket.gethostname() + '\n')
 
-    libc.umount2(tmpfs.encode('utf-8'), MNT_DETACH)
+    umount(tmpfs)
     os.rmdir(tmpfs)
 
 
 def pivot_namespace_root(target):
-    target = target.encode('utf-8')
     old_root = tempfile.mkdtemp(prefix='.oldroot', dir=target)
     pivot_root(target, old_root)
     os.chdir('/')
     pivoted_old_root = '/' + os.path.basename(old_root)
-    libc.umount2(pivoted_old_root, MNT_DETACH)
+    umount(pivoted_old_root)
     os.rmdir(pivoted_old_root)
 
 

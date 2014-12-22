@@ -1,7 +1,10 @@
 from _ctypes import POINTER
 from ctypes import CDLL, c_void_p, c_int, c_long, c_char_p, cast
 
-libcap = CDLL('libcap.so.2')
+try:
+    libcap = CDLL('libcap.so.2')
+except OSError:
+    libcap = None
 
 # linux/capability.h
 cap_value_t = c_int
@@ -123,57 +126,67 @@ def cap_get_proc_errcheck(result, func, args):
 
 cap_t = c_void_p  # opaque structure
 
-cap_get_proc = libcap.cap_get_proc
-cap_get_proc.errcheck = cap_get_proc_errcheck
-cap_get_proc.restype = cap_t
+if libcap:
+    cap_get_proc = libcap.cap_get_proc
+    cap_get_proc.errcheck = cap_get_proc_errcheck
+    cap_get_proc.restype = cap_t
 
-cap_clear = libcap.cap_clear
-cap_clear.argtypes = [cap_t]
-cap_clear.errcheck = cap_errcheck
+    cap_clear = libcap.cap_clear
+    cap_clear.argtypes = [cap_t]
+    cap_clear.errcheck = cap_errcheck
 
-cap_set_flag = libcap.cap_set_flag
-cap_set_flag.argtypes = [cap_t, cap_flag_t, c_int, POINTER(cap_value_t), cap_flag_value_t]
-cap_clear.errcheck = cap_errcheck
+    cap_set_flag = libcap.cap_set_flag
+    cap_set_flag.argtypes = [cap_t, cap_flag_t, c_int, POINTER(cap_value_t), cap_flag_value_t]
+    cap_clear.errcheck = cap_errcheck
 
-cap_set_proc = libcap.cap_set_proc
-cap_set_proc.argtypes = [cap_t]
-cap_set_proc.errcheck = cap_errcheck
+    cap_set_proc = libcap.cap_set_proc
+    cap_set_proc.argtypes = [cap_t]
+    cap_set_proc.errcheck = cap_errcheck
 
-cap_free = libcap.cap_free
-cap_free.argtypes = [cap_t]
-cap_free.errcheck = cap_errcheck
+    cap_free = libcap.cap_free
+    cap_free.argtypes = [cap_t]
+    cap_free.errcheck = cap_errcheck
 
-cap_drop_bound = libcap.cap_drop_bound
-cap_drop_bound.argtypes = [cap_value_t]
-cap_drop_bound.errcheck = cap_errcheck
+    cap_drop_bound = libcap.cap_drop_bound
+    cap_drop_bound.argtypes = [cap_value_t]
+    cap_drop_bound.errcheck = cap_errcheck
 
-cap_to_text = libcap.cap_to_text
-cap_to_text.argtypes = [cap_t, POINTER(c_long)]
-cap_to_text.restype = c_void_p
-
-
-def dump_caps():
-    proc_caps = cap_get_proc()
-    cap_text = cap_to_text(proc_caps, None)
-    cap_str = str(cast(cap_text, c_char_p).value)
-    cap_free(cap_text)
-    cap_free(proc_caps)
-    return cap_str
+    cap_to_text = libcap.cap_to_text
+    cap_to_text.argtypes = [cap_t, POINTER(c_long)]
+    cap_to_text.restype = c_void_p
 
 
-def drop_caps(cap_keep=DEFAULT_CAPS):
-    ncaps = len(cap_keep)
-    # noinspection PyCallingNonCallable
-    cap_flags = (cap_value_t * ncaps)(*cap_keep)
+    def dump_caps():
+        proc_caps = cap_get_proc()
+        cap_text = cap_to_text(proc_caps, None)
+        cap_str = str(cast(cap_text, c_char_p).value)
+        cap_free(cap_text)
+        cap_free(proc_caps)
+        return cap_str
 
-    cap_set = frozenset(cap_keep)
-    for cap in range(0, CAP_LAST_CAP + 1):
-        if cap not in cap_set:
-            cap_drop_bound(cap)
 
-    proc_caps = cap_get_proc()
-    cap_clear(proc_caps)
-    cap_set_flag(proc_caps, CAP_INHERITABLE, ncaps, cap_flags, CAP_SET)
-    cap_set_flag(proc_caps, CAP_EFFECTIVE, ncaps, cap_flags, CAP_SET)
-    cap_set_flag(proc_caps, CAP_PERMITTED, ncaps, cap_flags, CAP_SET)
-    cap_set_proc(proc_caps)
+    def drop_caps(cap_keep=DEFAULT_CAPS):
+        ncaps = len(cap_keep)
+        # noinspection PyCallingNonCallable
+        cap_flags = (cap_value_t * ncaps)(*cap_keep)
+
+        cap_set = frozenset(cap_keep)
+        for cap in range(0, CAP_LAST_CAP + 1):
+            if cap not in cap_set:
+                cap_drop_bound(cap)
+
+        proc_caps = cap_get_proc()
+        cap_clear(proc_caps)
+        cap_set_flag(proc_caps, CAP_INHERITABLE, ncaps, cap_flags, CAP_SET)
+        cap_set_flag(proc_caps, CAP_EFFECTIVE, ncaps, cap_flags, CAP_SET)
+        cap_set_flag(proc_caps, CAP_PERMITTED, ncaps, cap_flags, CAP_SET)
+        cap_set_proc(proc_caps)
+else:
+
+    def dump_caps():
+        raise NotImplementedError()
+
+    # noinspection PyUnusedLocal
+    def drop_caps(cap_keep=DEFAULT_CAPS):
+        raise NotImplementedError()
+

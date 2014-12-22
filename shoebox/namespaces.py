@@ -1,36 +1,14 @@
 from collections import defaultdict
-from ctypes import CDLL
 import logging
 import os
 
 from shoebox.capabilities import drop_caps
+from shoebox.libc import unshare, sethostname, CLONE_NEWUSER, CLONE_NEWNS, CLONE_NEWIPC, CLONE_NEWUTS, CLONE_NEWPID, \
+    CLONE_NEWNET
 from shoebox.user_namespace import UserNamespace
 
 
-libc = CDLL('libc.so.6')
 logger = logging.getLogger('shoebox')
-
-
-# linux/sched.h
-CLONE_NEWNS = 0x00020000
-CLONE_NEWUTS = 0x04000000
-CLONE_NEWIPC = 0x08000000
-CLONE_NEWNET = 0x40000000
-CLONE_NEWUSER = 0x10000000
-CLONE_NEWPID = 0x20000000
-
-
-def unshare(flags):
-    if libc.unshare(flags) != 0:
-        # errno gets clobbered so that's all we know
-        raise OSError('Failed to unshare {0:x}'.format(flags))
-
-
-def sethostname(hostname):
-    h = hostname.encode('utf-8')
-    if libc.sethostname(h, len(h)) != 0:
-        # errno gets clobbered so that's all we know
-        raise OSError('Failed to sethostname {0}'.format(hostname))
 
 
 class ContainerNamespace(object):

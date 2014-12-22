@@ -39,7 +39,7 @@ class Container(object):
     def volumes(self):
         volumes = []
         for vol in self.metadata.volumes:
-            target = os.path.join(self.volume_root, mangle_volume_name(vol)).encode('utf-8')
+            target = os.path.join(self.volume_root, mangle_volume_name(vol))
             while os.path.exists(target) and os.path.islink(target):
                 target = os.readlink(target)
             if not os.path.exists(target):
