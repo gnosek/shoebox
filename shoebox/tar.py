@@ -6,12 +6,12 @@ import operator
 import errno
 import urlparse
 import time
-
 import os
-import requests
 import subprocess
-from shoebox.mount_namespace import FilesystemNamespace
 
+import requests
+
+from shoebox.mount_namespace import FilesystemNamespace
 from shoebox.namespaces import ContainerNamespace
 
 
@@ -191,7 +191,7 @@ class ExtractNamespacedTar(ExtractTarBase):
 
     def src_namespace(self):
         fs = FilesystemNamespace(self.src_dir)
-        return ContainerNamespace(fs, target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid)
+        return ContainerNamespace(fs, self.namespace.userns)
 
     def child_setup(self):
         os.close(self.wpipe)

@@ -12,6 +12,7 @@ from shoebox.exec_commands import exec_in_namespace
 from shoebox.networking import PrivateNetwork
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
 from shoebox.rm import remove_container
+from shoebox.user_namespace import UserNamespace
 
 
 def is_container_id(container_id):
@@ -43,6 +44,8 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     else:
         private_net = None
 
+    userns = UserNamespace(target_uid, target_gid)
+
     if is_container_id(container_id):
         container = Container(shoebox_dir, container_id)
         container.load_metadata()
@@ -56,9 +59,9 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         metadata = repo.metadata(image_id, tag)
         metadata = inherit_docker_metadata(metadata)
         metadata = metadata._replace(run_commands=[])
-        container = build(None, force, metadata, repo, shoebox_dir, target_gid, target_uid)
+        container = build(None, force, metadata, repo, shoebox_dir, userns)
 
-    namespace = container.namespace(target_uid, target_gid, private_net)
+    namespace = container.namespace(userns, private_net)
 
     if entrypoint is None:
         entrypoint = container.metadata.entrypoint or []
@@ -84,6 +87,6 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     try:
         namespace.run(exec_in_namespace, context, command)
         if rm:
-            remove_container(shoebox_dir, container_id, False, target_uid, target_gid)
+            remove_container(shoebox_dir, container_id, userns, False)
     finally:
         container.cleanup_runtime_files()

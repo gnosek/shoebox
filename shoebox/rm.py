@@ -7,6 +7,7 @@ import os
 from shoebox.mount_namespace import FilesystemNamespace
 
 from shoebox.namespaces import ContainerNamespace
+from shoebox.user_namespace import UserNamespace
 
 
 logger = logging.getLogger('shoebox.rm')
@@ -16,7 +17,7 @@ def rm_layer(namespace):
     namespace.run(shutil.rmtree, '/', ignore_errors=True)
 
 
-def remove_container(shoebox_dir, container_id, volumes=False, target_uid=None, target_gid=None):
+def remove_container(shoebox_dir, container_id, userns, volumes=False):
     runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
     target_base = os.path.join(runtime_dir, 'base')
     target_delta = os.path.join(runtime_dir, 'delta')
@@ -35,7 +36,7 @@ def remove_container(shoebox_dir, container_id, volumes=False, target_uid=None, 
     for directory in directories:
         if os.path.exists(directory):
             fs = FilesystemNamespace(directory)
-            namespace = ContainerNamespace(fs, target_uid=target_uid, target_gid=target_gid)
+            namespace = ContainerNamespace(fs, userns)
             logger.info('Removing {0}'.format(directory))
             rm_layer(namespace)
             os.rmdir(directory)
@@ -61,5 +62,6 @@ def cli(container_id, shoebox_dir, target_uid=None, target_gid=None, volumes=Fal
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
+    userns = UserNamespace(target_uid, target_gid)
     for container in container_id:
-        remove_container(shoebox_dir, container, volumes, target_uid, target_gid)
+        remove_container(shoebox_dir, container, userns, volumes)

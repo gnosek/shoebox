@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from ctypes import CDLL
 import getpass
 import itertools
 import logging
@@ -53,33 +52,38 @@ def single_id_map(map_name, id_inside, id_outside):
         print >> fp, '{0} {1} 1'.format(id_inside, id_outside)
 
 
-@contextmanager
-def setup_userns(target_uid=None, target_gid=None):
-    uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
-    gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
-    uid, gid = os.getuid(), os.getgid()
+class UserNamespace(object):
+    def __init__(self, target_uid=None, target_gid=None):
+        self.target_uid = target_uid
+        self.target_gid = target_gid
 
-    if not uid_map or not gid_map:
-        logger.warning('No mapping found for current user in /etc/subuid or /etc/subgid, mapping root directly')
-        target_uid = 0
-        target_gid = 0
+    @contextmanager
+    def setup_userns(self):
+        uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
+        gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
+        uid, gid = os.getuid(), os.getgid()
 
-    idmap_helper = None
+        if not uid_map or not gid_map:
+            logger.warning('No mapping found for current user in /etc/subuid or /etc/subgid, mapping root directly')
+            target_uid = 0
+            target_gid = 0
 
-    if target_uid is None and target_gid is None:
-        idmap_helper = spawn_helper('idmap', apply_id_maps, os.getpid(), uid_map, gid_map)
-    elif target_uid is None or target_gid is None:
-        raise RuntimeError('If either of target uid/gid is present both are required')
+        idmap_helper = None
 
-    yield
+        if self.target_uid is None and self.target_gid is None:
+            idmap_helper = spawn_helper('idmap', apply_id_maps, os.getpid(), uid_map, gid_map)
+        elif self.target_uid is None or self.target_gid is None:
+            raise RuntimeError('If either of target uid/gid is present both are required')
 
-    if idmap_helper:
-        try:
-            idmap_helper.wait()
-        except subprocess.CalledProcessError:
-            logger.warning('UID/GID helper failed to run, mapping root directly')
-            target_uid, target_gid = 0, 0
+        yield
 
-    if target_uid is not None:
-        single_id_map('uid', target_uid, uid)
-        single_id_map('gid', target_gid, gid)
+        if idmap_helper:
+            try:
+                idmap_helper.wait()
+            except subprocess.CalledProcessError:
+                logger.warning('UID/GID helper failed to run, mapping root directly')
+                target_uid, target_gid = 0, 0
+
+        if self.target_uid is not None:
+            single_id_map('uid', self.target_uid, uid)
+            single_id_map('gid', self.target_gid, gid)

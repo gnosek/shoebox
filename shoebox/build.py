@@ -7,18 +7,19 @@ import os
 from shoebox.container import Container
 from shoebox.dockerfile import parse_dockerfile, ExecContext
 from shoebox.pull import ImageRepository, DEFAULT_INDEX
+from shoebox.user_namespace import UserNamespace
 
 
 logger = logging.getLogger('shoebox.build')
 
 
-def build(base_dir, force, dockerfile, repo, shoebox_dir, target_gid, target_uid):
+def build(base_dir, force, dockerfile, repo, shoebox_dir, userns):
     container_id = os.urandom(32).encode('hex')
     container = Container(shoebox_dir, container_id)
     repo.unpack(container.target_base, dockerfile.base_image_id, force)
     container.save_metadata(dockerfile)
 
-    namespace = container.build_namespace(target_uid, target_gid)
+    namespace = container.build_namespace(userns)
     exec_context = ExecContext(namespace=namespace, basedir=base_dir)
     for cmd in dockerfile.run_commands:
         try:
@@ -46,6 +47,7 @@ def cli(base_dir, shoebox_dir, index_url, force, target_uid, target_gid):
     repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
 
     dockerfile = parse_dockerfile(open(dockerfile_path).read(), repo=repo)
-    container = build(os.getcwd(), force, dockerfile, repo, shoebox_dir, target_gid, target_uid)
+    userns = UserNamespace(target_uid, target_gid)
+    container = build(os.getcwd(), force, dockerfile, repo, shoebox_dir, userns)
 
     print container.container_id

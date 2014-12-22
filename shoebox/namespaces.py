@@ -3,7 +3,7 @@ import logging
 import os
 
 from shoebox.capabilities import drop_caps
-from shoebox.user_namespace import setup_userns
+from shoebox.user_namespace import UserNamespace
 
 
 libc = CDLL('libc.so.6')
@@ -26,20 +26,22 @@ def unshare(flags):
 
 
 class ContainerNamespace(object):
-    def __init__(self, filesystem, target_uid=None, target_gid=None, private_net=None):
-        self.target_uid = target_uid
-        self.target_gid = target_gid
+    def __init__(self, filesystem, user_namespace=None, private_net=None):
         self.filesystem = filesystem
+        if user_namespace is None:
+            self.user_namespace = UserNamespace(None, None)
+        else:
+            self.user_namespace = user_namespace
         self.private_net = private_net
 
-    def __repr__(self):
-        return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(
-            id=id(self), **self.__dict__)
+    # def __repr__(self):
+    #     return '<{id}> {layers!r} + {volumes!r} -> {target}, {target_uid}:{target_gid} special_fs:{special_fs}'.format(
+    #         id=id(self), **self.__dict__)
 
     def create_userns(self):
         namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
 
-        with setup_userns(self.target_uid, self.target_gid):
+        with self.user_namespace.setup_userns():
             if self.private_net:
                 namespaces |= CLONE_NEWNET
                 with self.private_net.setup_netns():
