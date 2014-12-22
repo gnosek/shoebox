@@ -7,10 +7,24 @@ import pyroute2
 from shoebox.namespace_utils import spawn_helper
 
 
+def detect_bridge():
+    username = getpass.getuser()
+    with open('/etc/lxc/lxc-usernet') as usernet:
+        for line in usernet:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            user, dev_type, bridge, count = line.split()
+            if user != username:
+                continue
+            return bridge, dev_type
+    return None, None
+
+
 class PrivateNetwork(object):
     def __init__(self, bridge, ip_address, dev_type='veth'):
         if bridge == 'auto':
-            bridge, dev_type = self.detect_bridge()
+            bridge, dev_type = detect_bridge()
         self.bridge = bridge
         self.ip_address = ip_address
         self.gateway, self.prefixlen = self.gateway_settings()
@@ -18,19 +32,6 @@ class PrivateNetwork(object):
 
     def __repr__(self):
         return '{0}/{1} via {2}@{3}'.format(self.ip_address, self.prefixlen, self.gateway, self.bridge)
-
-    def detect_bridge(self):
-        username = getpass.getuser()
-        with open('/etc/lxc/lxc-usernet') as usernet:
-            for line in usernet:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                user, dev_type, bridge, count = line.split()
-                if user != username:
-                    continue
-                return bridge, dev_type
-        return None, None
 
     def gateway_settings(self):
         """return ip/mask of bridge to use as default gateway"""

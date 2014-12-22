@@ -68,8 +68,6 @@ class UserNamespace(object):
 
         if not uid_map or not gid_map:
             logger.warning('No mapping found for current user in /etc/subuid or /etc/subgid, mapping root directly')
-            target_uid = 0
-            target_gid = 0
 
         idmap_helper = None
 
@@ -85,7 +83,6 @@ class UserNamespace(object):
                 idmap_helper.wait()
             except subprocess.CalledProcessError:
                 logger.warning('UID/GID helper failed to run, mapping root directly')
-                target_uid, target_gid = 0, 0
 
         if self.target_uid is not None:
             single_id_map('uid', self.target_uid, uid)

@@ -71,6 +71,7 @@ def exec_in_namespace(context, command):
             logger.error(
                 'Cannot switch to user {0} ({1}:{2}), possibly due to direct uid/gid mapping'.format(
                     context.user, uid, gid))
+            # noinspection PyProtectedMember
             os._exit(1)
 
     os.chdir(context.workdir)
@@ -94,18 +95,19 @@ class CopyCommand(namedtuple('CopyCommand', 'src_paths dst_path')):
         CopyFiles(exec_context.namespace, self.dst_path, exec_context.basedir, self.src_paths).run()
 
 
+def src_type(path):
+    if path.startswith('http://') or path.startswith('https://'):
+        return 'url'
+
+    if detect_tar_format(path):
+        return 'tar'
+
+    return 'file'
+
+
 class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
-    def src_type(self, path):
-        if path.startswith('http://') or path.startswith('https://'):
-            return 'url'
-
-        if detect_tar_format(path):
-            return 'tar'
-
-        return 'file'
-
     def handle_item(self, namespace, basedir, path):
-        item_type = self.src_type(path)
+        item_type = src_type(path)
         if item_type == 'url':
             basedir = basedir or os.getcwd()
             logger.info('Downloading {0} -> {1}'.format(path, self.dst_path))
@@ -122,7 +124,7 @@ class AddCommand(namedtuple('AddCommand', 'src_paths dst_path')):
     def execute(self, exec_context):
         if len(self.src_paths) > 1 and not self.dst_path.endswith('/'):
             raise RuntimeError('With multiple source files target must be a directory (end with /)')
-        if all(self.src_type(src) == 'file' for src in self.src_paths):
+        if all(src_type(src) == 'file' for src in self.src_paths):
             # no urls or archives, copy them in one go
             if exec_context.basedir is None:
                 logger.warning('Skipping ADD {0} -> {1} -- no base directory'.format(self.src_paths, self.dst_path))

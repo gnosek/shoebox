@@ -107,6 +107,7 @@ ff02::2 ip6-allrouters
         except:
             logger.exception('Exception inside namespace {0!r}'.format(self))
         finally:
+            # noinspection PyProtectedMember
             os._exit(exitcode)
 
     def run(self, ns_func, *args, **kwargs):

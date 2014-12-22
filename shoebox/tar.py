@@ -42,9 +42,9 @@ def detect_tar_format(path):
     if not os.path.isfile(path):
         return False
 
-    for ext, format in TARBALL_EXTENSIONS.items():
+    for ext, fmt in TARBALL_EXTENSIONS.items():
         if path.endswith(ext):
-            return format
+            return fmt
 
 
 class ContainerTarFile(tarfile.TarFile):
@@ -118,6 +118,7 @@ class ExtractTarBase(object):
         except tarfile.ReadError as exc:
             if exc.message == 'empty file':
                 # oh well, this happens
+                # noinspection PyProtectedMember
                 os._exit(0)
             raise
 
@@ -215,10 +216,10 @@ class UnpackArchive(ExtractNamespacedTar):
         self.archive_path = archive_path
 
     def build_tar_archive(self, archive):
-        format = detect_tar_format(self.archive_path)
+        fmt = detect_tar_format(self.archive_path)
         tar_pipe = archive
         xz = None
-        if format == 'xz':
+        if fmt == 'xz':
             logger.info('Unpacking xz archive {0}'.format(self.archive_path))
             xz = subprocess.Popen(['xzcat'], stdin=subprocess.PIPE, stdout=archive)
             tar_pipe = xz.stdin

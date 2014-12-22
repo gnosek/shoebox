@@ -1,8 +1,8 @@
 from collections import namedtuple
 import json
 import datetime
-
 import re
+
 import pyparsing as p
 
 from shoebox.exec_commands import RunCommand, CopyCommand, AddCommand
@@ -12,7 +12,8 @@ RunContext = namedtuple('RunContext', 'environ user workdir')
 ExecContext = namedtuple('ExecContext', 'namespace basedir')
 
 Dockerfile = namedtuple(
-    'Dockerfile', 'base_image base_image_id context run_commands expose entrypoint volumes command repo onbuild hostname')
+    'Dockerfile',
+    'base_image base_image_id context run_commands expose entrypoint volumes command repo onbuild hostname')
 
 eol = p.LineEnd().suppress()
 sp = p.White().suppress()
@@ -61,7 +62,7 @@ class DockerfileCommand(object):
         return cls.parser.parseString(value, parseAll=True)
 
 
-class FROM_command(DockerfileCommand):
+class FromDockerfileCommand(DockerfileCommand):
     class FromCommand(Stanza):
 
         onbuild_allowed = False
@@ -80,6 +81,7 @@ class FROM_command(DockerfileCommand):
             """
             assert context.base_image_id is None
             if context.repo is None:
+                # noinspection PyProtectedMember
                 context = context._replace(base_image=(self.image_name, self.tag))
             else:
                 metadata = context.repo.metadata(self.image_name, self.tag)
@@ -141,7 +143,7 @@ class EnvRefCommand(DockerfileCommand):
     )
 
 
-class ENV_command(EnvRefCommand):
+class EnvDockerfileCommand(EnvRefCommand):
     class EnvVariable(Stanza):
         def __init__(self, tokens):
             self.name = tokens['name']
@@ -153,7 +155,9 @@ class ENV_command(EnvRefCommand):
         def evaluate(self, context):
             environ = dict(context.context.environ)
             environ[self.name] = ''.join(v.expand(environ) for v in self.value)
+            # noinspection PyProtectedMember
             subcontext = context.context._replace(environ=environ)
+            # noinspection PyProtectedMember
             return context._replace(context=subcontext)
 
     env_var = EnvRefCommand.env_var
@@ -166,7 +170,7 @@ class ENV_command(EnvRefCommand):
     parser = env_spaced | p.OneOrMore(env_kw)
 
 
-class WORKDIR_command(EnvRefCommand):
+class WorkdirDockerfileCommand(EnvRefCommand):
     class WorkDir(Stanza):
         def __init__(self, tokens):
             self.workdir = tokens['workdir']
@@ -177,13 +181,15 @@ class WORKDIR_command(EnvRefCommand):
         def evaluate(self, context):
             environ = context.context.environ
             workdir = ''.join(v.expand(environ) for v in self.workdir)
+            # noinspection PyProtectedMember
             subcontext = context.context._replace(workdir=workdir)
+            # noinspection PyProtectedMember
             return context._replace(context=subcontext)
 
     parser = EnvRefCommand.env_word_value('workdir').setParseAction(WorkDir)
 
 
-class EXPOSE_command(EnvRefCommand):
+class ExposeDockerfileCommand(EnvRefCommand):
     class ExposePort(Stanza):
         def __init__(self, tokens):
             self.port = tokens['port']
@@ -200,14 +206,15 @@ class EXPOSE_command(EnvRefCommand):
             else:
                 proto = 'tcp'
                 port = int(port)
-            context = context._replace(expose=context.expose | set(((port, proto),)))
+            # noinspection PyProtectedMember
+            context = context._replace(expose=context.expose | {(port, proto)})
             return context
 
     single_parser = EnvRefCommand.env_word_value('port').setParseAction(ExposePort)
     parser = single_parser + p.ZeroOrMore(sp + single_parser)
 
 
-class ADD_command(EnvRefCommand):
+class AddDockerfileCommand(EnvRefCommand):
     class Add(Stanza):
         def __init__(self, tokens):
             path_list = tokens['path_list'].asList()
@@ -224,6 +231,7 @@ class ADD_command(EnvRefCommand):
             destination = ''.join(v.expand(environ) for v in self.destination)
             commands = list(context.run_commands)
             commands.append(AddCommand(sources, destination))
+            # noinspection PyProtectedMember
             context = context._replace(run_commands=commands)
             return context
 
@@ -231,7 +239,7 @@ class ADD_command(EnvRefCommand):
     parser = p.Group(single_parser + p.ZeroOrMore(sp + single_parser))('path_list').setParseAction(Add)
 
 
-class COPY_command(EnvRefCommand):
+class CopyDockerfileCommand(EnvRefCommand):
     class Copy(Stanza):
         def __init__(self, tokens):
             path_list = tokens['path_list'].asList()
@@ -248,6 +256,7 @@ class COPY_command(EnvRefCommand):
             destination = ''.join(v.expand(environ) for v in self.destination)
             commands = list(context.run_commands)
             commands.append(CopyCommand(sources, destination))
+            # noinspection PyProtectedMember
             context = context._replace(run_commands=commands)
             return context
 
@@ -255,7 +264,7 @@ class COPY_command(EnvRefCommand):
     parser = p.Group(single_parser + p.ZeroOrMore(sp + single_parser))('path_list').setParseAction(Copy)
 
 
-class VOLUME_command(EnvRefCommand):
+class VolumeDockerfileCommand(EnvRefCommand):
     class Volume(Stanza):
         def __init__(self, tokens):
             self.path = tokens['path']
@@ -268,6 +277,7 @@ class VOLUME_command(EnvRefCommand):
             path = ''.join(v.expand(environ) for v in self.path)
             volumes = set(context.volumes)
             volumes.add(path)
+            # noinspection PyProtectedMember
             return context._replace(volumes=volumes)
 
     parser = EnvRefCommand.env_word_value('path').setParseAction(Volume)
@@ -299,7 +309,7 @@ def format_exec_command(keyword, value):
     return '{0} {1}'.format(keyword, json.dumps(value))
 
 
-class USER_command(EnvRefCommand):
+class UserDockerfileCommand(EnvRefCommand):
     class User(Stanza):
         def __init__(self, tokens):
             self.name = tokens['name']
@@ -310,13 +320,15 @@ class USER_command(EnvRefCommand):
         def evaluate(self, context):
             environ = context.context.environ
             username = ''.join(v.expand(environ) for v in self.name)
+            # noinspection PyProtectedMember
             subcontext = context.context._replace(user=username)
+            # noinspection PyProtectedMember
             return context._replace(context=subcontext)
 
     parser = EnvRefCommand.env_word_value('name').setParseAction(User)
 
 
-class MAINTAINER_command(EnvRefCommand):
+class MaintainerDockerfileCommand(EnvRefCommand):
     class Maintainer(Stanza):
         onbuild_allowed = False
 
@@ -331,13 +343,13 @@ class MAINTAINER_command(EnvRefCommand):
         return cls.Maintainer(value)
 
 
-class INSERT_command(EnvRefCommand):
+class InsertDockerfileCommand(EnvRefCommand):
     @classmethod
     def parse(cls, value):
         return p.ParseResults([])
 
 
-class RUN_command(ExecCommand):
+class RunDockerfileCommand(ExecCommand):
     class RunCommand(Stanza):
         def __init__(self, command):
             self.command = command
@@ -348,6 +360,7 @@ class RUN_command(ExecCommand):
         def evaluate(self, context):
             commands = list(context.run_commands)
             commands.append(RunCommand(self.command, context.context))
+            # noinspection PyProtectedMember
             context = context._replace(run_commands=commands)
             return context
 
@@ -356,7 +369,7 @@ class RUN_command(ExecCommand):
         return cls.RunCommand(cls.parse_maybe_json(value))
 
 
-class CMD_command(ExecCommand):
+class CmdDockerfileCommand(ExecCommand):
     class Cmd(Stanza):
         def __init__(self, command):
             self.command = command
@@ -365,6 +378,7 @@ class CMD_command(ExecCommand):
             return format_exec_command('CMD', self.command)
 
         def evaluate(self, context):
+            # noinspection PyProtectedMember
             return context._replace(command=self.command)
 
     @classmethod
@@ -372,7 +386,7 @@ class CMD_command(ExecCommand):
         return cls.Cmd(cls.parse_maybe_json(value))
 
 
-class ENTRYPOINT_command(ExecCommand):
+class EntrypointDockerfileCommand(ExecCommand):
     class Entrypoint(Stanza):
         def __init__(self, command):
             self.command = command
@@ -381,6 +395,7 @@ class ENTRYPOINT_command(ExecCommand):
             return format_exec_command('ENTRYPOINT', self.command)
 
         def evaluate(self, context):
+            # noinspection PyProtectedMember
             return context._replace(entrypoint=self.command)
 
     @classmethod
@@ -388,7 +403,7 @@ class ENTRYPOINT_command(ExecCommand):
         return cls.Entrypoint(cls.parse_maybe_json(value))
 
 
-class ONBUILD_command(DockerfileCommand):
+class OnbuildDockerfileCommand(DockerfileCommand):
     class OnBuild(Stanza):
         onbuild_allowed = False
 
@@ -403,6 +418,7 @@ class ONBUILD_command(DockerfileCommand):
         def evaluate(self, context):
             onbuild = list(context.onbuild)
             onbuild.append(self.command)
+            # noinspection PyProtectedMember
             return context._replace(onbuild=onbuild)
 
     @classmethod
@@ -421,20 +437,20 @@ class FallbackDockerDirective(Stanza):
 
 
 DOCKER_COMMANDS = {
-    'USER': USER_command,
-    'ONBUILD': ONBUILD_command,
-    'WORKDIR': WORKDIR_command,
-    'ENV': ENV_command,
-    'MAINTAINER': MAINTAINER_command,
-    'FROM': FROM_command,
-    'ADD': ADD_command,
-    'COPY': COPY_command,
-    'RUN': RUN_command,
-    'CMD': CMD_command,
-    'ENTRYPOINT': ENTRYPOINT_command,
-    'EXPOSE': EXPOSE_command,
-    'VOLUME': VOLUME_command,
-    'INSERT': INSERT_command,
+    'USER': UserDockerfileCommand,
+    'ONBUILD': OnbuildDockerfileCommand,
+    'WORKDIR': WorkdirDockerfileCommand,
+    'ENV': EnvDockerfileCommand,
+    'MAINTAINER': MaintainerDockerfileCommand,
+    'FROM': FromDockerfileCommand,
+    'ADD': AddDockerfileCommand,
+    'COPY': CopyDockerfileCommand,
+    'RUN': RunDockerfileCommand,
+    'CMD': CmdDockerfileCommand,
+    'ENTRYPOINT': EntrypointDockerfileCommand,
+    'EXPOSE': ExposeDockerfileCommand,
+    'VOLUME': VolumeDockerfileCommand,
+    'INSERT': InsertDockerfileCommand,
 }
 
 
@@ -522,7 +538,7 @@ def from_docker_metadata(meta_json):
     onbuild = []
     if config['OnBuild']:
         for v in config['OnBuild']:
-            onbuild.extend(ONBUILD_command.parse(v))
+            onbuild.extend(OnbuildDockerfileCommand.parse(v))
 
     dockerfile = Dockerfile(
         base_image=None,
@@ -543,6 +559,7 @@ def from_docker_metadata(meta_json):
 def inherit_docker_metadata(metadata):
     context = from_docker_metadata(metadata)
     onbuild = context.onbuild or []
+    # noinspection PyProtectedMember
     context = context._replace(base_image_id=metadata['id'], onbuild=[])
     for directive in onbuild:
         context = directive.command.evaluate(context)
@@ -660,6 +677,7 @@ vf
     import pprint
 
     try:
+        # noinspection PyProtectedMember
         pprint.pprint(dict(parse_dockerfile(example)._asdict()))
     except:
         for i, line in enumerate(example.splitlines()):

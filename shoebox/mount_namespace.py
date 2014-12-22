@@ -105,9 +105,9 @@ def mount_etc_files(target_dir_func):
             open(target, 'w').close()
         bind_mount(tmpfile, target)
 
-    for path in ('/etc/resolv.conf', '/etc/hosts'):
-        content = open(path).read()
-        write_and_mount_file(path, content)
+    for etc_path in ('/etc/resolv.conf', '/etc/hosts'):
+        etc_content = open(etc_path).read()
+        write_and_mount_file(etc_path, etc_content)
 
     write_and_mount_file('/etc/hostname', socket.gethostname() + '\n')
 
@@ -152,6 +152,7 @@ class FilesystemNamespace(object):
             sig = ret & 0x7f
             if sig:
                 exitcode = 128 + sig
+            # noinspection PyProtectedMember
             os._exit(exitcode)
 
         mount_root_fs(self.target, self.layers)

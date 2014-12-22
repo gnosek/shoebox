@@ -27,6 +27,7 @@ def spawn_helper(name, func, *args, **kwargs):
             func(*args, **kwargs)
             exitcode = 0
         finally:
+            # noinspection PyProtectedMember
             os._exit(exitcode)
     else:
         os.close(rd)

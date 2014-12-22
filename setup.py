@@ -9,8 +9,8 @@ setup(
     author='Grzegorz Nosek',
     author_email='root@localdomain.pl',
     description='Tiny docker replacement',
-    requires=['requests', 'click', 'pyroute2'],
-    install_requires=['requests', 'click', 'pyroute2'],
+    requires=['requests', 'click', 'pyroute2', 'pyparsing'],
+    install_requires=['requests', 'click', 'pyroute2', 'pyparsing'],
     entry_points='''
         [console_scripts]
         shoebox-pull=shoebox.pull:pull
@@ -20,7 +20,7 @@ setup(
 
         shoebox-ls=shoebox.utils:ls
         shoebox-ps=shoebox.utils:ps
-        shoebox-tag=shoebox.utils:tag
+        shoebox-tag=shoebox.utils:tag_container
         shoebox-untag=shoebox.utils:untag
 
         shoebox-ancestry=shoebox.pull:ancestry

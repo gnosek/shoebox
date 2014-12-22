@@ -155,7 +155,6 @@ if libcap:
     cap_to_text.argtypes = [cap_t, POINTER(c_long)]
     cap_to_text.restype = c_void_p
 
-
     def dump_caps():
         proc_caps = cap_get_proc()
         cap_text = cap_to_text(proc_caps, None)
@@ -163,7 +162,6 @@ if libcap:
         cap_free(cap_text)
         cap_free(proc_caps)
         return cap_str
-
 
     def drop_caps(cap_keep=DEFAULT_CAPS):
         ncaps = len(cap_keep)

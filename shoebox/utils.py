@@ -56,7 +56,7 @@ def ps(shoebox_dir):
 @click.option('--force/--no-force', help='overwrite tag if it already exists')
 @click.argument('container_id')
 @click.argument('tag')
-def tag(shoebox_dir, container_id, tag, force):
+def tag_container(shoebox_dir, container_id, tag, force):
     shoebox_dir = os.path.expanduser(shoebox_dir)
     container_dir = os.path.join(shoebox_dir, 'containers')
 

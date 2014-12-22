@@ -49,14 +49,16 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
     if from_image is None:
         if container_id is None:
             logging.error('Either container_id or --from image is required')
+            # noinspection PyProtectedMember
             os._exit(1)
         container = Container(shoebox_dir, container_id)
         try:
             container.load_metadata()
         except IOError:
             logging.error(
-                'Cannot find container named {0}, check name or use run --from {0} to build container from repository image'.format(
-                    container_id))
+                'Cannot find container named {0}, '
+                'check name or use run --from {0} to build container from repository image'.format(container_id))
+            # noinspection PyProtectedMember
             os._exit(1)
     else:
         storage_dir = os.path.join(shoebox_dir, 'images')
@@ -67,6 +69,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
             image_id, tag = from_image, 'latest'
         metadata = repo.metadata(image_id, tag)
         metadata = inherit_docker_metadata(metadata)
+        # noinspection PyProtectedMember
         metadata = metadata._replace(run_commands=[])
         container = build(None, force, metadata, repo, shoebox_dir, userns)
 
@@ -80,7 +83,8 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         else:
             logging.warning('Ignoring container links when running without private networking')
 
-    namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname, links=links)
+    namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname,
+                                   links=links)
 
     if entrypoint is None:
         entrypoint = container.metadata.entrypoint or []
@@ -96,8 +100,10 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     context = container.metadata.context
     if user:
+        # noinspection PyProtectedMember
         context = context._replace(user=user)
     if workdir:
+        # noinspection PyProtectedMember
         context = context._replace(workdir=workdir)
 
     environ = context.environ
