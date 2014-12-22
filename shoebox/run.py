@@ -21,10 +21,11 @@ def is_container_id(container_id):
 
 
 @click.command()
-@click.argument('container_id')
+@click.argument('container_id', required=False)
 @click.argument('command', nargs=-1)
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
+@click.option('--from', name='from_image', help='create new container from image')
 @click.option('--entrypoint', help='override image entrypoint')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
@@ -35,7 +36,7 @@ def is_container_id(container_id):
 @click.option('--workdir', '-w', help='work directory')
 @click.option('--rm/--no-rm', help='remove container after exit')
 def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None,
-        target_gid=None, force=False, rm=False, bridge=None, ip=None):
+        target_gid=None, force=False, rm=False, bridge=None, ip=None, from_image=None):
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
@@ -47,16 +48,19 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     userns = UserNamespace(target_uid, target_gid)
 
-    if is_container_id(container_id):
+    if from_image is None:
         container = Container(shoebox_dir, container_id)
         container.load_metadata()
     else:
+        if container_id is None:
+            logging.error('Either container_id or --from image is required')
+            os._exit(1)
         storage_dir = os.path.join(shoebox_dir, 'images')
         repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
         try:
-            image_id, tag = container_id.split(':', 1)
+            image_id, tag = from_image.split(':', 1)
         except ValueError:
-            image_id, tag = container_id, 'latest'
+            image_id, tag = from_image, 'latest'
         metadata = repo.metadata(image_id, tag)
         metadata = inherit_docker_metadata(metadata)
         metadata = metadata._replace(run_commands=[])
