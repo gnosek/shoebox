@@ -45,10 +45,11 @@ class ContainerNamespace(object):
     def __repr__(self):
         return 'FS: {0!r}, USER: {1!r}, NET: {2!r}'.format(self.filesystem, self.user_namespace, self.private_net)
 
-    def create_userns(self):
-        namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
+    def build(self):
+        self.filesystem.check_root_dir()
 
         with self.user_namespace.setup_userns():
+            namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
             if self.private_net:
                 namespaces |= CLONE_NEWNET
                 with self.private_net.setup_netns():
@@ -59,9 +60,6 @@ class ContainerNamespace(object):
         if self.hostname:
             sethostname(self.hostname)
 
-    def build(self):
-        self.filesystem.check_root_dir()
-        self.create_userns()
         self.filesystem.build()
         drop_caps()
         os.setgroups([os.getgid()])
