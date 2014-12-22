@@ -1,3 +1,4 @@
+from collections import defaultdict
 from ctypes import CDLL
 import logging
 import os
@@ -33,7 +34,7 @@ def sethostname(hostname):
 
 
 class ContainerNamespace(object):
-    def __init__(self, filesystem, user_namespace=None, private_net=None, hostname=None):
+    def __init__(self, filesystem, user_namespace=None, private_net=None, hostname=None, links=None):
         self.filesystem = filesystem
         if user_namespace is None:
             self.user_namespace = UserNamespace(None, None)
@@ -41,9 +42,25 @@ class ContainerNamespace(object):
             self.user_namespace = user_namespace
         self.private_net = private_net
         self.hostname = hostname
+        self.links = links
 
     def __repr__(self):
         return 'FS: {0!r}, USER: {1!r}, NET: {2!r}'.format(self.filesystem, self.user_namespace, self.private_net)
+
+    def linked_hostnames(self):
+        if not self.links:
+            return
+
+        ip_names = defaultdict(set)
+        ip_aliases = defaultdict(set)
+        aliases = set()
+        for link in self.links:
+            ip_names[link.target_ip].add(link.container_id)
+            ip_aliases[link.target_ip].add(link.alias)
+            aliases.add(link.alias)
+
+        for ip, names in ip_names.items():
+            yield ip, list(ip_aliases[ip]) + [n for n in names if n not in aliases]
 
     def etc_hosts(self):
         base_hosts = """
@@ -54,9 +71,14 @@ class ContainerNamespace(object):
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 """
+        hosts = []
         if self.private_net and self.private_net.ip_address and self.hostname:
-            return '{0} {1}'.format(self.private_net.ip_address, self.hostname) + base_hosts
-        return base_hosts
+            hosts.append('{0} {1}'.format(self.private_net.ip_address, self.hostname))
+
+            for ip, names in self.linked_hostnames():
+                hosts.append('{0} {1}'.format(ip, ' '.join(names)))
+
+        return '\n'.join(hosts) + base_hosts
 
     def etc_resolv_conf(self):
         resolvconf = []

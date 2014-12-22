@@ -76,7 +76,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
             link_ct = Container(shoebox_dir, source)
             links.append(ContainerLink(link_ct, alias))
 
-    namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname)
+    namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname, links=links)
 
     if entrypoint is None:
         entrypoint = container.metadata.entrypoint or []
