@@ -4,7 +4,7 @@ import os
 import click
 
 from shoebox.build import build
-from shoebox.container import Container
+from shoebox.container import Container, ContainerLink
 from shoebox.dockerfile import inherit_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
 from shoebox.namespaces import ContainerNamespace
@@ -21,6 +21,7 @@ from shoebox.user_namespace import UserNamespace
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
 @click.option('--from', help='create new container from image')
 @click.option('--entrypoint', help='override image entrypoint')
+@click.option('--link', multiple=True, help='link containers')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
 @click.option('--bridge', default='auto',
@@ -31,7 +32,7 @@ from shoebox.user_namespace import UserNamespace
 @click.option('--workdir', '-w', help='work directory')
 @click.option('--rm/--no-rm', help='remove container after exit')
 def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None,
-        target_gid=None, force=False, rm=False, bridge=None, ip=None, **kwargs):
+        target_gid=None, force=False, rm=False, bridge=None, ip=None, link=None, **kwargs):
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
@@ -68,6 +69,13 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         metadata = metadata._replace(run_commands=[])
         container = build(None, force, metadata, repo, shoebox_dir, userns)
 
+    links = []
+    if link is not None:
+        for l in link:
+            source, alias = l.split(':', 1)
+            link_ct = Container(shoebox_dir, source)
+            links.append(ContainerLink(link_ct, alias))
+
     namespace = ContainerNamespace(container.filesystem(), userns, private_net, hostname=container.metadata.hostname)
 
     if entrypoint is None:
@@ -93,6 +101,9 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         environ['TERM'] = os.environ['TERM']
     if 'LANG' in os.environ:
         environ['LANG'] = os.environ['LANG']
+
+    for l in links:
+        environ.update(l.environ())
 
     container.write_pidfile()
     if private_net and private_net.ip_address:

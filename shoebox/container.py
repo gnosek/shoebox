@@ -88,3 +88,30 @@ class Container(object):
                     target = os.path.abspath(os.path.join(self.container_base_dir, target))
                 if target == self.runtime_dir:
                     yield tag
+
+
+class ContainerLink(object):
+    def __init__(self, container, alias):
+        self.alias = alias
+        self.source_container = container
+        self.source_container.load_metadata()
+        self.ports = self.source_container.metadata.expose
+        if not self.ports:
+            raise RuntimeError('Source container does not expose any ports')
+        self.target_ip = self.source_container.ip_address()
+        if not self.target_ip:
+            raise RuntimeError('Source container has no IP address')
+
+    def environ(self):
+        env = {}
+        lowest_port, lp_proto = sorted(self.ports)[0]
+        label = self.alias.upper()
+        env['{0}_NAME'.format(label)] = self.source_container.container_id
+        env['{0}_PORT'.format(label)] = '{0}://{1}:{2}'.format(lp_proto, self.target_ip, lowest_port)
+        for port, proto in self.ports:
+            env['{0}_PORT_{1}_{2}'.format(label, port, proto.upper())] = '{0}://{1}:{2}'.format(
+                proto, self.target_ip, port)
+            env['{0}_PORT_{1}_{2}_PROTO'.format(label, port, proto.upper())] = proto.upper()
+            env['{0}_PORT_{1}_{2}_PORT'.format(label, port, proto.upper())] = str(port)
+            env['{0}_PORT_{1}_{2}_ADDR'.format(label, port, proto.upper())] = self.target_ip
+        return env
