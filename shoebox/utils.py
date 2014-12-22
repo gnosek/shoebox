@@ -1,15 +1,9 @@
 import os
 import subprocess
-import sys
-
-import click
 
 from shoebox.container import Container, is_container_id
 
 
-@click.command()
-@click.option('--shoebox-dir', default='~/.shoebox', help='base directory')
-@click.option('--quiet/--no-quiet', '-q', help='quiet mode (only container ids)')
 def ls(shoebox_dir, quiet):
     shoebox_dir = os.path.expanduser(shoebox_dir)
     container_dir = os.path.join(shoebox_dir, 'containers')
@@ -25,8 +19,6 @@ def ls(shoebox_dir, quiet):
                 print '  tags:', ' '.join(tags)
 
 
-@click.command()
-@click.option('--shoebox-dir', default='~/.shoebox', help='base directory')
 def ps(shoebox_dir):
     shoebox_dir = os.path.expanduser(shoebox_dir)
     container_dir = os.path.join(shoebox_dir, 'containers')
@@ -51,50 +43,37 @@ def ps(shoebox_dir):
         print
 
 
-@click.command()
-@click.option('--shoebox-dir', default='~/.shoebox', help='base directory')
-@click.option('--force/--no-force', help='overwrite tag if it already exists')
-@click.argument('container_id')
-@click.argument('tag')
 def tag_container(shoebox_dir, container_id, tag, force):
     shoebox_dir = os.path.expanduser(shoebox_dir)
     container_dir = os.path.join(shoebox_dir, 'containers')
 
     if not is_container_id(container_id):
-        print >> sys.stderr, 'Invalid container_id format'
-        sys.exit(1)
+        raise RuntimeError('Invalid container_id format')
 
     if is_container_id(tag):
-        print >> sys.stderr, 'Tag cannot be a valid container id'
-        sys.exit(1)
+        raise RuntimeError('Tag cannot be a valid container id')
 
     container_path = os.path.join(container_dir, container_id)
     tag_path = os.path.join(container_dir, tag)
 
     if not os.path.isdir(container_path):
-        print >> sys.stderr, 'Container does not exist'
-        sys.exit(1)
+        raise RuntimeError('Container does not exist')
 
     if os.path.exists(tag_path):
         if not force:
-            print >> sys.stderr, 'Tag already exists'
-            sys.exit(1)
+            raise RuntimeError('Tag already exists')
         else:
             os.unlink(tag_path)
 
     os.symlink(container_id, tag_path)
 
 
-@click.command()
-@click.option('--shoebox-dir', default='~/.shoebox', help='base directory')
-@click.argument('tag')
 def untag(shoebox_dir, tag):
     shoebox_dir = os.path.expanduser(shoebox_dir)
     container_dir = os.path.join(shoebox_dir, 'containers')
 
     if is_container_id(tag):
-        print >> sys.stderr, 'Tag cannot be a valid container id'
-        sys.exit(1)
+        raise RuntimeError('Tag cannot be a valid container id')
 
     tag_path = os.path.join(container_dir, tag)
 

@@ -1,7 +1,11 @@
 import json
 import logging
 import os
+import sys
+
 import click
+
+from shoebox import utils
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
 
 
@@ -58,3 +62,40 @@ def ancestry(obj, image, tag):
 def pull(obj, image, tag, force):
     repo = obj['repo']
     repo.pull(image, tag, force)
+
+
+@cli.command()
+@click.option('--quiet/--no-quiet', '-q', help='quiet mode (only container ids)')
+@click.pass_obj
+def ls(obj, quiet):
+    utils.ls(obj['shoebox_dir'], quiet)
+
+
+@cli.command()
+@click.pass_obj
+def ps(obj):
+    utils.ps(obj['shoebox_dir'])
+
+
+@cli.command(name='tag')
+@click.argument('container_id')
+@click.argument('tag')
+@click.option('--force/--no-force', help='overwrite tag if it already exists')
+@click.pass_obj
+def tag_container(obj, container_id, tag, force):
+    try:
+        utils.tag_container(obj['shoebox_dir'], container_id, tag, force)
+    except RuntimeError as exc:
+        click.echo(exc)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument('tag')
+@click.pass_obj
+def untag(obj, tag):
+    try:
+        utils.untag(obj['shoebox_dir'], tag)
+    except RuntimeError as exc:
+        click.echo(exc)
+        sys.exit(1)
