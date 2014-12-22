@@ -49,7 +49,13 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
             logging.error('Either container_id or --from image is required')
             os._exit(1)
         container = Container(shoebox_dir, container_id)
-        container.load_metadata()
+        try:
+            container.load_metadata()
+        except IOError:
+            logging.error(
+                'Cannot find container named {0}, check name or use run --from {0} to build container from repository image'.format(
+                    container_id))
+            os._exit(1)
     else:
         storage_dir = os.path.join(shoebox_dir, 'images')
         repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
