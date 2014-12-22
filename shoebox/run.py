@@ -25,7 +25,7 @@ def is_container_id(container_id):
 @click.argument('command', nargs=-1)
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
-@click.option('--from', name='from_image', help='create new container from image')
+@click.option('--from-image', '--from', name='from_image', help='create new container from image')
 @click.option('--entrypoint', help='override image entrypoint')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
