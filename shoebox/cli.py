@@ -11,11 +11,13 @@ from shoebox.pull import DEFAULT_INDEX, ImageRepository
 @click.option('--debug/--no-debug', help='debugging output')
 @click.pass_context
 def cli(ctx, shoebox_dir, index_url, debug):
-    ctx.obj['shoebox_dir'] = os.path.expanduser(shoebox_dir)
-    ctx.obj['index_url'] = index_url
+    shoebox_dir = os.path.expanduser(shoebox_dir)
+    storage_dir = os.path.join(shoebox_dir, 'images')
+    ctx.obj = {
+        'shoebox_dir': shoebox_dir,
+        'repo': ImageRepository(index_url=index_url, storage_dir=storage_dir),
+    }
 
-    storage_dir = os.path.join(ctx.obj['shoebox_dir'], 'images')
-    ctx.obj['repo'] = ImageRepository(index_url=index_url, storage_dir=storage_dir)
     if debug:
         logging.basicConfig(level=logging.DEBUG)
     else:
