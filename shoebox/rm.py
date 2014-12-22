@@ -1,13 +1,10 @@
 import logging
 import shutil
 import errno
-
-import click
 import os
-from shoebox.mount_namespace import FilesystemNamespace
 
+from shoebox.mount_namespace import FilesystemNamespace
 from shoebox.namespaces import ContainerNamespace
-from shoebox.user_namespace import UserNamespace
 
 
 logger = logging.getLogger('shoebox.rm')
@@ -37,7 +34,7 @@ def remove_container(shoebox_dir, container_id, userns, volumes=False):
         if os.path.exists(directory):
             fs = FilesystemNamespace(directory)
             namespace = ContainerNamespace(fs, userns)
-            logger.info('Removing {0}'.format(directory))
+            logger.debug('Removing {0}'.format(directory))
             rm_layer(namespace)
             os.rmdir(directory)
     if os.path.exists(metadata_file):
@@ -45,23 +42,9 @@ def remove_container(shoebox_dir, container_id, userns, volumes=False):
 
     try:
         os.rmdir(runtime_dir)
+        logger.info('Removed {0}'.format(container_id))
     except OSError as exc:
         if exc.errno == errno.ENOTEMPTY:
             logger.info('{0} not empty, not removing'.format(runtime_dir))
         else:
             raise
-
-
-@click.command()
-@click.argument('container_id', nargs=-1)
-@click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
-@click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
-@click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
-@click.option('--volumes/--no-volumes', '-v', help='Also remove container volumes')
-def cli(container_id, shoebox_dir, target_uid=None, target_gid=None, volumes=False):
-    logging.basicConfig(level=logging.INFO)
-
-    shoebox_dir = os.path.expanduser(shoebox_dir)
-    userns = UserNamespace(target_uid, target_gid)
-    for container in container_id:
-        remove_container(shoebox_dir, container, userns, volumes)

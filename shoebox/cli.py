@@ -11,6 +11,7 @@ from shoebox.container import Container, ContainerLink
 from shoebox.dockerfile import parse_dockerfile
 from shoebox.networking import PrivateNetwork
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
+from shoebox.rm import remove_container
 from shoebox.run import run_container, load_container, clone_image
 from shoebox.user_namespace import UserNamespace
 
@@ -171,3 +172,16 @@ def run(obj, container_id, command, bridge, entrypoint, env, force, from_image, 
         container = clone_image(force, from_image, repo, shoebox_dir, userns)
 
     run_container(container, userns, shoebox_dir, command, entrypoint, user, workdir, rm, private_net, links, env)
+
+
+@cli.command()
+@click.argument('container_id', nargs=-1)
+@click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
+@click.option('--volumes/--no-volumes', '-v', help='Also remove container volumes')
+@click.pass_obj
+def rm(obj, container_id, target_uid, target_gid, volumes):
+    shoebox_dir = obj['shoebox_repo']
+    userns = UserNamespace(target_uid, target_gid)
+    for container in container_id:
+        remove_container(shoebox_dir, container, userns, volumes)
