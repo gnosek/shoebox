@@ -3,7 +3,10 @@ from contextlib import contextmanager
 import getpass
 import os
 import subprocess
-import pyroute2
+try:
+    import pyroute2
+except ImportError:
+    pyroute2 = None
 from shoebox.namespace_utils import spawn_helper
 
 
@@ -63,6 +66,8 @@ class PrivateNetwork(object):
     @contextmanager
     def setup_netns(self):
         if self.bridge:
+            if pyroute2 is None:
+                raise NotImplementedError()
             netns_helper = spawn_helper('netns', self.init_net_interface, os.getpid())
         else:
             netns_helper = None  # make PyCharm happy
