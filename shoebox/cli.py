@@ -7,8 +7,11 @@ import click
 
 from shoebox import utils
 from shoebox.build import build_container
+from shoebox.container import Container, ContainerLink
 from shoebox.dockerfile import parse_dockerfile
+from shoebox.networking import PrivateNetwork
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
+from shoebox.run import run_container, load_container, clone_image
 from shoebox.user_namespace import UserNamespace
 
 
@@ -121,3 +124,50 @@ def build(obj, base_dir, force, target_uid, target_gid):
     container = build_container(os.getcwd(), force, dockerfile, repo, shoebox_dir, userns)
 
     print container.container_id
+
+
+@cli.command()
+@click.argument('container_id', required=False)
+@click.argument('command', nargs=-1)
+@click.option('--bridge', default='auto',
+              help='bridge to attach private network (requires lxc installed), None to disable')
+@click.option('--entrypoint', help='override image entrypoint')
+@click.option('--env', '-e', multiple=True, help='extra environment variables')
+@click.option('--force/--no-force', default=False, help='force download')
+@click.option('--from', 'from_image', help='create new container from image')
+@click.option('--ip', help='private IP address (when using --bridge)')
+@click.option('--link', multiple=True, help='link containers')
+@click.option('--rm/--no-rm', help='remove container after exit')
+@click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
+@click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--user', '-u', help='user to run as')
+@click.option('--workdir', '-w', help='work directory')
+@click.pass_obj
+def run(obj, container_id, command, bridge, entrypoint, env, force, from_image, ip, link, rm,
+        target_uid, target_gid, user, workdir):
+    shoebox_dir = obj['shoebox_dir']
+    repo = obj['repo']
+
+    if bridge != 'None' and ip is not None:
+        private_net = PrivateNetwork(bridge, ip)
+    else:
+        private_net = None
+
+    links = []
+    if link is not None:
+        if private_net and ip:
+            for l in link:
+                source, alias = l.split(':', 1)
+                link_ct = Container(shoebox_dir, source)
+                links.append(ContainerLink(link_ct, alias))
+        else:
+            logging.warning('Ignoring container links when running without private networking')
+
+    userns = UserNamespace(target_uid, target_gid)
+
+    if from_image is None:
+        container = load_container(container_id, shoebox_dir)
+    else:
+        container = clone_image(force, from_image, repo, shoebox_dir, userns)
+
+    run_container(container, userns, shoebox_dir, command, entrypoint, user, workdir, rm, private_net, links, env)

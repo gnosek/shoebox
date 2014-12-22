@@ -14,7 +14,6 @@ setup(
     entry_points='''
         [console_scripts]
         shoebox=shoebox.cli:cli
-        shoebox-run=shoebox.run:run
         shoebox-rm=shoebox.rm:cli
     ''',
 )
