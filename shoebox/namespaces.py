@@ -68,10 +68,6 @@ class ContainerNamespace(object):
 
         create_namespaces(self.target, self.layers, self.volumes, self.special_fs, is_root)
         drop_caps()
-        os.seteuid(target_uid)
-        os.setegid(target_gid)
-        os.setuid(target_uid)
-        os.setgid(target_gid)
         os.setgroups([target_gid])
 
     def execns(self, ns_func, *args, **kwargs):
