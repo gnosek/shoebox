@@ -33,9 +33,9 @@ def cli(ctx, shoebox_dir, index_url, debug):
 @cli.command()
 @click.argument('image')
 @click.option('--tag', '-t', default='latest', help='image tag (version)')
-@click.pass_context
-def metadata(ctx, image, tag):
-    repo = ctx.obj['repo']
+@click.pass_obj
+def metadata(obj, image, tag):
+    repo = obj['repo']
     meta = repo.metadata(image, tag)
     print json.dumps(meta, indent=4)
 
@@ -43,8 +43,18 @@ def metadata(ctx, image, tag):
 @cli.command()
 @click.argument('image')
 @click.option('--tag', '-t', default='latest', help='image tag (version)')
-@click.pass_context
-def ancestry(ctx, image, tag):
-    repo = ctx.obj['repo']
+@click.pass_obj
+def ancestry(obj, image, tag):
+    repo = obj['repo']
     for image_id in repo.ancestry(image, tag):
         print image_id
+
+
+@cli.command()
+@click.argument('image')
+@click.option('--force/--no-force', default=False, help='force download')
+@click.option('--tag', '-t', default='latest', help='tag to pull')
+@click.pass_obj
+def pull(obj, image, tag, force):
+    repo = obj['repo']
+    repo.pull(image, tag, force)

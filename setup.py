@@ -15,7 +15,6 @@ setup(
         [console_scripts]
         shoebox=shoebox.cli:cli
 
-        shoebox-pull=shoebox.pull:pull
         shoebox-build=shoebox.build:cli
         shoebox-run=shoebox.run:run
         shoebox-rm=shoebox.rm:cli
@@ -24,8 +23,5 @@ setup(
         shoebox-ps=shoebox.utils:ps
         shoebox-tag=shoebox.utils:tag_container
         shoebox-untag=shoebox.utils:untag
-
-        shoebox-ancestry=shoebox.pull:ancestry
-        shoebox-metadata=shoebox.pull:get_metadata
     ''',
 )

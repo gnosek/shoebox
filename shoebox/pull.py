@@ -1,9 +1,8 @@
 import json
 import logging
-
 import os
+
 import requests
-import click
 
 from shoebox import tar
 from shoebox.mount_namespace import FilesystemNamespace
@@ -158,40 +157,3 @@ class ImageRepository(object):
             if os.path.exists(cached_path):
                 return json.load(open(cached_path))
         return self.image_metadata(target_image_id)
-
-
-@click.command()
-@click.option('--storage-dir', default='~/.shoebox/images', help='image repository')
-@click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
-@click.option('--force/--no-force', default=False, help='force download')
-@click.option('--tag', default='latest', help='tag to pull')
-@click.argument('image')
-def pull(image, tag='latest', force=False, index_url=DEFAULT_INDEX, storage_dir='images'):
-    logging.basicConfig(level=logging.DEBUG)
-    repo = ImageRepository(index_url=index_url, storage_dir=os.path.expanduser(storage_dir))
-    metadata = repo.pull(image, tag, force)
-
-    import pprint
-
-    pprint.pprint(metadata[-1])
-
-
-@click.command()
-@click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
-@click.option('--tag', default='latest', help='tag to pull')
-@click.argument('image')
-def ancestry(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images'):
-    logging.basicConfig(level=logging.DEBUG)
-    repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
-    for image_id in repo.ancestry(image, tag):
-        print image_id
-
-
-@click.command()
-@click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
-@click.option('--tag', default='latest', help='tag to pull')
-@click.argument('image')
-def get_metadata(image, tag='latest', index_url=DEFAULT_INDEX, storage_dir='images'):
-    logging.basicConfig(level=logging.DEBUG)
-    repo = ImageRepository(index_url=index_url, storage_dir=storage_dir)
-    print json.dumps(repo.metadata(image, tag), indent=4)
