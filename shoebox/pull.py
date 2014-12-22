@@ -20,9 +20,10 @@ class ImageRepository(object):
         self.repositories = []
         self.storage_dir = os.path.abspath(storage_dir)
         self.logger = logging.getLogger('shoebox.pull')
+        self.progress_logger = logging.getLogger('shoebox.progress')
 
     def request_access(self, image):
-        self.logger.info('Requesting access to image {0} at {1}'.format(image, self.index_url))
+        self.logger.debug('Requesting access to image {0} at {1}'.format(image, self.index_url))
         response = requests.get('{0}/v1/repositories/{1}/images'.format(self.index_url, image),
                                 headers={'X-Docker-Token': 'true'})
         response.raise_for_status()
@@ -34,8 +35,8 @@ class ImageRepository(object):
         if not self.repositories:
             self.repositories = [self.index_url]
 
-        logging.info('Auth token: {0}'.format(self.token))
-        logging.info('Repository endpoints: {0}'.format(self.repositories))
+        self.logger.debug('Auth token: {0}'.format(self.token))
+        self.logger.debug('Repository endpoints: {0}'.format(self.repositories))
 
     def repository_request(self, url, stream=False):
         if not self.repositories:
@@ -50,7 +51,7 @@ class ImageRepository(object):
         response.status_code = 500
         for repo in self.repositories:
             repo_url = '{0}{1}'.format(repo, url)
-            self.logger.info('Repository request: {0}'.format(repo_url))
+            self.logger.debug('Repository request: {0}'.format(repo_url))
             response = requests.get(repo_url, headers=headers, stream=stream)
             if response.status_code == 404:
                 response.raise_for_status()
@@ -110,7 +111,7 @@ class ImageRepository(object):
             for chunk in image.iter_content(chunk_size=1 << 16):
                 if chunk:
                     downloaded += len(chunk)
-                    self.logger.info(progress_format.format(downloaded >> 10))
+                    self.progress_logger.info(progress_format.format(downloaded >> 10))
                     fp.write(chunk)
                     fp.flush()
 
@@ -137,7 +138,7 @@ class ImageRepository(object):
             namespace = ContainerNamespace(fs)
             tar.ExtractTarFile(namespace, '/', layer).run()
 
-        self.logger.info('Unpacked {0} in {1}'.format(image_id, target_dir))
+        self.logger.debug('Unpacked {0} in {1}'.format(image_id, target_dir))
         return target_dir
 
     def ancestry(self, image, tag='latest'):
