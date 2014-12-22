@@ -13,6 +13,8 @@ setup(
     install_requires=['requests', 'click', 'pyroute2', 'pyparsing'],
     entry_points='''
         [console_scripts]
+        shoebox=shoebox.cli:cli
+
         shoebox-pull=shoebox.pull:pull
         shoebox-build=shoebox.build:cli
         shoebox-run=shoebox.run:run
