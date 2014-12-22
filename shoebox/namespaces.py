@@ -33,7 +33,7 @@ class ContainerNamespace(object):
         ip_aliases = defaultdict(set)
         aliases = set()
         for link in self.links:
-            ip_names[link.target_ip].add(link.container_id)
+            ip_names[link.target_ip].add(link.source_container.container_id)
             ip_aliases[link.target_ip].add(link.alias)
             aliases.add(link.alias)
 
