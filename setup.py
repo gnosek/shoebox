@@ -20,6 +20,8 @@ setup(
 
         shoebox-ls=shoebox.utils:ls
         shoebox-ps=shoebox.utils:ps
+        shoebox-tag=shoebox.utils:tag
+        shoebox-untag=shoebox.utils:untag
 
         shoebox-ancestry=shoebox.pull:ancestry
         shoebox-metadata=shoebox.pull:get_metadata

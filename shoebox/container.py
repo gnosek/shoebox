@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 from shoebox.dockerfile import from_docker_metadata, to_docker_metadata
 from shoebox.mount_namespace import FilesystemNamespace
@@ -9,9 +10,14 @@ def mangle_volume_name(vol):
     return vol.strip('/').replace('_', '__').replace('/', '_')
 
 
+def is_container_id(container_id):
+    return re.match('^[0-9a-f]{64}$', container_id)
+
+
 class Container(object):
     def __init__(self, shoebox_dir, container_id):
         self.container_id = container_id
+        self.container_base_dir = os.path.join(shoebox_dir, 'containers')
         self.runtime_dir = os.path.join(shoebox_dir, 'containers', container_id)
         self.metadata_file = os.path.join(self.runtime_dir, 'metadata.json')
         self.target_base = os.path.join(self.runtime_dir, 'base')
@@ -73,3 +79,10 @@ class Container(object):
             if os.path.exists(p):
                 os.unlink(p)
 
+    def tags(self):
+        for tag in os.listdir(self.container_base_dir):
+            tag_path = os.path.join(self.container_base_dir, tag)
+            if not is_container_id(tag) and os.path.islink(tag_path):
+                target = os.path.abspath(os.readlink(tag_path))
+                if target == self.runtime_dir:
+                    yield tag

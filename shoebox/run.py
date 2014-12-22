@@ -1,9 +1,7 @@
 import logging
+import os
 
 import click
-
-import os
-import re
 
 from shoebox.build import build
 from shoebox.container import Container
@@ -16,10 +14,6 @@ from shoebox.rm import remove_container
 from shoebox.user_namespace import UserNamespace
 
 
-def is_container_id(container_id):
-    return re.match('^[0-9a-f]{64}$', container_id)
-
-
 @click.command()
 @click.argument('container_id', required=False)
 @click.argument('command', nargs=-1)
@@ -29,7 +23,8 @@ def is_container_id(container_id):
 @click.option('--entrypoint', help='override image entrypoint')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
-@click.option('--bridge', default='auto', help='bridge to attach private network (requires lxc installed), None to disable')
+@click.option('--bridge', default='auto',
+              help='bridge to attach private network (requires lxc installed), None to disable')
 @click.option('--ip', help='private IP address (when using --bridge)')
 @click.option('--force/--no-force', default=False, help='force download')
 @click.option('--user', '-u', help='user to run as')
