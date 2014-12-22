@@ -9,7 +9,7 @@ from shoebox.build import build
 from shoebox.container import Container
 from shoebox.dockerfile import inherit_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
-from shoebox.namespaces import PrivateNetwork
+from shoebox.networking import PrivateNetwork
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
 from shoebox.rm import remove_container
 
