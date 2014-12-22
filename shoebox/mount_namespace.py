@@ -153,32 +153,44 @@ def pivot_namespace_root(target):
     os.rmdir(pivoted_old_root)
 
 
-def create_namespaces(target, layers, volumes, special_fs=True, is_root=True):
-    pid = os.fork()
-    if pid:
-        _, ret = os.waitpid(pid, 0)
-        exitcode = ret >> 8
-        sig = ret & 0x7f
-        if sig:
-            exitcode = 128 + sig
-        os._exit(exitcode)
+class FilesystemNamespace(object):
+    def __init__(self, target, layers=None, volumes=None, special_fs=False):
+        self.target = target
+        self.layers = layers
+        self.volumes = volumes
+        self.special_fs = special_fs
 
-    def target_subdir(path):
-        return os.path.join(target, path.lstrip('/'))
+    def target_subdir(self, path):
+        return os.path.join(self.target, path.lstrip('/'))
 
-    mount_root_fs(target, layers)
-    if volumes:
-        mount_volumes(target_subdir, volumes)
+    def check_root_dir(self):
+        if not os.path.exists(self.target):
+            if self.layers:
+                os.makedirs(self.target)
+            else:
+                raise RuntimeError('{0} does not exist'.format(self.target))
 
-    if special_fs:
-        if is_root:
-            mount_devices(target_subdir)
-        else:
-            logger.warning('Cannot mount devpts when not mapping to root, expect TTY malfunction')
-        mount_procfs(target_subdir)
-        mount_sysfs(target_subdir)
-        mount_etc_files(target_subdir)
-    pivot_namespace_root(target)
+    def build(self):
+        pid = os.fork()
+        if pid:
+            _, ret = os.waitpid(pid, 0)
+            exitcode = ret >> 8
+            sig = ret & 0x7f
+            if sig:
+                exitcode = 128 + sig
+            os._exit(exitcode)
 
+        mount_root_fs(self.target, self.layers)
+        if self.volumes:
+            mount_volumes(self.target_subdir, self.volumes)
 
+        if self.special_fs:
+            if os.geteuid() == 0:
+                mount_devices(self.target_subdir)
+            else:
+                logger.warning('Cannot mount devpts when not mapping to root, expect TTY malfunction')
+            mount_procfs(self.target_subdir)
+            mount_sysfs(self.target_subdir)
+            mount_etc_files(self.target_subdir)
+        pivot_namespace_root(self.target)
 

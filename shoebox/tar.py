@@ -10,6 +10,7 @@ import time
 import os
 import requests
 import subprocess
+from shoebox.mount_namespace import FilesystemNamespace
 
 from shoebox.namespaces import ContainerNamespace
 
@@ -189,9 +190,8 @@ class ExtractNamespacedTar(ExtractTarBase):
         self.rpipe, self.wpipe = os.pipe()
 
     def src_namespace(self):
-        return ContainerNamespace(
-            self.src_dir, [], target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid,
-            special_fs=False)
+        fs = FilesystemNamespace(self.src_dir)
+        return ContainerNamespace(fs, target_uid=self.namespace.target_uid, target_gid=self.namespace.target_gid)
 
     def child_setup(self):
         os.close(self.wpipe)

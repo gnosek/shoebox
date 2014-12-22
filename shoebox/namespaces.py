@@ -3,7 +3,6 @@ import logging
 import os
 
 from shoebox.capabilities import drop_caps
-from shoebox.mount_namespace import create_namespaces
 from shoebox.user_namespace import setup_userns
 
 
@@ -27,14 +26,10 @@ def unshare(flags):
 
 
 class ContainerNamespace(object):
-    def __init__(self, target, layers, volumes=None, target_uid=None, target_gid=None, special_fs=True,
-                 private_net=None):
-        self.target = target
-        self.layers = layers
-        self.volumes = volumes
+    def __init__(self, filesystem, target_uid=None, target_gid=None, private_net=None):
         self.target_uid = target_uid
         self.target_gid = target_gid
-        self.special_fs = special_fs
+        self.filesystem = filesystem
         self.private_net = private_net
 
     def __repr__(self):
@@ -44,8 +39,7 @@ class ContainerNamespace(object):
     def create_userns(self):
         namespaces = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWPID
 
-        ugid_dict = {}
-        with setup_userns(ugid_dict, self.target_uid, self.target_gid):
+        with setup_userns(self.target_uid, self.target_gid):
             if self.private_net:
                 namespaces |= CLONE_NEWNET
                 with self.private_net.setup_netns():
@@ -53,22 +47,12 @@ class ContainerNamespace(object):
             else:
                 unshare(namespaces)
 
-        return ugid_dict['uid'], ugid_dict['gid']
-
-
     def build(self):
-        if not os.path.exists(self.target):
-            if self.layers:
-                os.makedirs(self.target)
-            else:
-                raise RuntimeError('{0} does not exist'.format(self.target))
-
-        target_uid, target_gid = self.create_userns()
-        is_root = (target_uid == 0 and target_gid == 0)
-
-        create_namespaces(self.target, self.layers, self.volumes, self.special_fs, is_root)
+        self.filesystem.check_root_dir()
+        self.create_userns()
+        self.filesystem.build()
         drop_caps()
-        os.setgroups([target_gid])
+        os.setgroups([os.getgid()])
 
     def execns(self, ns_func, *args, **kwargs):
         exitcode = 1

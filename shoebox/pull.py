@@ -6,6 +6,7 @@ import requests
 import click
 
 from shoebox import tar
+from shoebox.mount_namespace import FilesystemNamespace
 from shoebox.namespaces import ContainerNamespace
 
 
@@ -132,7 +133,8 @@ class ImageRepository(object):
 
         for image_id in reversed(self.ancestors(image_id)):
             layer = self.download_image(image_id, force=force_download)
-            namespace = ContainerNamespace(target_dir, layers=None, special_fs=False)
+            fs = FilesystemNamespace(target_dir)
+            namespace = ContainerNamespace(fs)
             tar.ExtractTarFile(namespace, '/', layer).run()
 
         self.logger.info('Unpacked {0} in {1}'.format(image_id, target_dir))

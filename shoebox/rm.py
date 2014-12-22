@@ -4,6 +4,7 @@ import errno
 
 import click
 import os
+from shoebox.mount_namespace import FilesystemNamespace
 
 from shoebox.namespaces import ContainerNamespace
 
@@ -33,8 +34,8 @@ def remove_container(shoebox_dir, container_id, volumes=False, target_uid=None, 
             logger.info('Preserving volumes in {0}'.format(volume_root))
     for directory in directories:
         if os.path.exists(directory):
-            namespace = ContainerNamespace(directory, None, target_uid=target_uid, target_gid=target_gid,
-                                           special_fs=False)
+            fs = FilesystemNamespace(directory)
+            namespace = ContainerNamespace(fs, target_uid=target_uid, target_gid=target_gid)
             logger.info('Removing {0}'.format(directory))
             rm_layer(namespace)
             os.rmdir(directory)

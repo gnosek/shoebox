@@ -54,7 +54,7 @@ def single_id_map(map_name, id_inside, id_outside):
 
 
 @contextmanager
-def setup_userns(ugid_dict, target_uid=None, target_gid=None):
+def setup_userns(target_uid=None, target_gid=None):
     uid_map = list(itertools.chain(*load_id_map('/etc/subuid', os.getuid())))
     gid_map = list(itertools.chain(*load_id_map('/etc/subgid', os.getgid())))
     uid, gid = os.getuid(), os.getgid()
@@ -79,12 +79,7 @@ def setup_userns(ugid_dict, target_uid=None, target_gid=None):
         except subprocess.CalledProcessError:
             logger.warning('UID/GID helper failed to run, mapping root directly')
             target_uid, target_gid = 0, 0
-        else:
-            ugid_dict['uid'] = 0
-            ugid_dict['gid'] = 0
 
     if target_uid is not None:
         single_id_map('uid', target_uid, uid)
         single_id_map('gid', target_gid, gid)
-        ugid_dict['uid'] = target_uid
-        ugid_dict['gid'] = target_gid

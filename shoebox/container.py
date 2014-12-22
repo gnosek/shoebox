@@ -3,6 +3,7 @@ import json
 import os
 
 from shoebox.dockerfile import from_docker_metadata, to_docker_metadata
+from shoebox.mount_namespace import FilesystemNamespace
 
 from shoebox.namespaces import ContainerNamespace
 
@@ -45,10 +46,12 @@ class Container(object):
 
     def namespace(self, target_uid, target_gid, private_net):
         layers = [self.target_base, self.target_delta]
-        return ContainerNamespace(self.target_root, layers, self.volumes(), target_uid, target_gid, True, private_net)
+        fs = FilesystemNamespace(self.target_root, layers, self.volumes(), True)
+        return ContainerNamespace(fs, target_uid, target_gid, private_net)
 
     def build_namespace(self, target_uid, target_gid):
-        return ContainerNamespace(self.target_base, None, None, target_uid, target_gid, special_fs=False)
+        fs = FilesystemNamespace(self.target_base)
+        return ContainerNamespace(fs, target_uid, target_gid)
 
     def write_pidfile(self):
         with open(self.pidfile, 'w') as fp:
