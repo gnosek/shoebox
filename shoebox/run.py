@@ -25,7 +25,7 @@ def is_container_id(container_id):
 @click.argument('command', nargs=-1)
 @click.option('--shoebox-dir', default='~/.shoebox', help='base directory for downloads')
 @click.option('--index-url', default=DEFAULT_INDEX, help='docker image index')
-@click.option('--from-image', '--from', help='create new container from image')
+@click.option('--from', help='create new container from image')
 @click.option('--entrypoint', help='override image entrypoint')
 @click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
 @click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
@@ -36,7 +36,7 @@ def is_container_id(container_id):
 @click.option('--workdir', '-w', help='work directory')
 @click.option('--rm/--no-rm', help='remove container after exit')
 def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, workdir=None, target_uid=None,
-        target_gid=None, force=False, rm=False, bridge=None, ip=None, from_image=None):
+        target_gid=None, force=False, rm=False, bridge=None, ip=None, **kwargs):
     logging.basicConfig(level=logging.INFO)
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
@@ -48,6 +48,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     userns = UserNamespace(target_uid, target_gid)
 
+    from_image = kwargs.pop('from', None)
     if from_image is None:
         container = Container(shoebox_dir, container_id)
         container.load_metadata()
