@@ -3,7 +3,7 @@ import os
 
 import click
 
-from shoebox.build import build
+from shoebox.build import build_container
 from shoebox.container import Container, ContainerLink
 from shoebox.dockerfile import inherit_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
@@ -71,7 +71,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         metadata = inherit_docker_metadata(metadata)
         # noinspection PyProtectedMember
         metadata = metadata._replace(run_commands=[])
-        container = build(None, force, metadata, repo, shoebox_dir, userns)
+        container = build_container(None, force, metadata, repo, shoebox_dir, userns)
 
     links = []
     if link is not None:

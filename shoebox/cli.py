@@ -6,7 +6,10 @@ import sys
 import click
 
 from shoebox import utils
+from shoebox.build import build_container
+from shoebox.dockerfile import parse_dockerfile
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
+from shoebox.user_namespace import UserNamespace
 
 
 @click.group()
@@ -100,3 +103,21 @@ def untag(obj, tag):
     except RuntimeError as exc:
         obj['logger'].error(exc)
         sys.exit(1)
+
+
+@cli.command()
+@click.argument('base_dir')
+@click.option('--force/--no-force', default=False, help='force download')
+@click.option('--target-uid', '-U', help='UID inside container (default: use newuidmap)', type=click.INT)
+@click.option('--target-gid', '-G', help='GID inside container (default: use newgidmap)', type=click.INT)
+@click.pass_obj
+def build(obj, base_dir, force, target_uid, target_gid):
+    repo = obj['repo']
+    shoebox_dir = obj['shoebox_dir']
+
+    os.chdir(base_dir)
+    dockerfile = parse_dockerfile(open('Dockerfile').read(), repo=repo)
+    userns = UserNamespace(target_uid, target_gid)
+    container = build_container(os.getcwd(), force, dockerfile, repo, shoebox_dir, userns)
+
+    print container.container_id
