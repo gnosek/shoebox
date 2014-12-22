@@ -9,6 +9,7 @@ from shoebox.build import build
 from shoebox.container import Container
 from shoebox.dockerfile import inherit_docker_metadata
 from shoebox.exec_commands import exec_in_namespace
+from shoebox.namespaces import ContainerNamespace
 from shoebox.networking import PrivateNetwork
 from shoebox.pull import DEFAULT_INDEX, ImageRepository
 from shoebox.rm import remove_container
@@ -61,7 +62,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
         metadata = metadata._replace(run_commands=[])
         container = build(None, force, metadata, repo, shoebox_dir, userns)
 
-    namespace = container.namespace(userns, private_net)
+    namespace = ContainerNamespace(container.filesystem(), userns, private_net)
 
     if entrypoint is None:
         entrypoint = container.metadata.entrypoint or []

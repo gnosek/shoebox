@@ -6,6 +6,7 @@ import os
 
 from shoebox.container import Container
 from shoebox.dockerfile import parse_dockerfile, ExecContext
+from shoebox.namespaces import ContainerNamespace
 from shoebox.pull import ImageRepository, DEFAULT_INDEX
 from shoebox.user_namespace import UserNamespace
 
@@ -19,7 +20,7 @@ def build(base_dir, force, dockerfile, repo, shoebox_dir, userns):
     repo.unpack(container.target_base, dockerfile.base_image_id, force)
     container.save_metadata(dockerfile)
 
-    namespace = container.build_namespace(userns)
+    namespace = ContainerNamespace(container.build_filesystem(), userns)
     exec_context = ExecContext(namespace=namespace, basedir=base_dir)
     for cmd in dockerfile.run_commands:
         try:

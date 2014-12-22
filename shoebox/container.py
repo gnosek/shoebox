@@ -3,7 +3,6 @@ import os
 
 from shoebox.dockerfile import from_docker_metadata, to_docker_metadata
 from shoebox.mount_namespace import FilesystemNamespace
-from shoebox.namespaces import ContainerNamespace
 
 
 def mangle_volume_name(vol):
@@ -42,14 +41,12 @@ class Container(object):
             volumes.append((target, vol))
         return volumes
 
-    def namespace(self, userns, private_net):
+    def filesystem(self):
         layers = [self.target_base, self.target_delta]
-        fs = FilesystemNamespace(self.target_root, layers, self.volumes(), True)
-        return ContainerNamespace(fs, userns, private_net)
+        return FilesystemNamespace(self.target_root, layers, self.volumes(), True)
 
-    def build_namespace(self, userns):
-        fs = FilesystemNamespace(self.target_base)
-        return ContainerNamespace(fs, userns)
+    def build_filesystem(self):
+        return FilesystemNamespace(self.target_base)
 
     def write_pidfile(self):
         with open(self.pidfile, 'w') as fp:
