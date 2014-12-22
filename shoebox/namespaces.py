@@ -45,6 +45,19 @@ class ContainerNamespace(object):
     def __repr__(self):
         return 'FS: {0!r}, USER: {1!r}, NET: {2!r}'.format(self.filesystem, self.user_namespace, self.private_net)
 
+    def etc_hosts(self):
+        base_hosts = """
+127.0.0.1	localhost
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+"""
+        if self.private_net and self.private_net.ip_address and self.hostname:
+            return '{0} {1}'.format(self.private_net.ip_address, self.hostname) + base_hosts
+        return base_hosts
+
     def build(self):
         self.filesystem.check_root_dir()
 
@@ -61,6 +74,8 @@ class ContainerNamespace(object):
             sethostname(self.hostname)
 
         self.filesystem.build()
+        with open('/etc/hosts', 'w') as hosts:
+            print >> hosts, self.etc_hosts()
         drop_caps()
         os.setgroups([os.getgid()])
 
