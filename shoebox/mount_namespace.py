@@ -1,6 +1,7 @@
 from ctypes import CDLL
 import logging
 import os
+import socket
 import stat
 import tempfile
 
@@ -130,8 +131,8 @@ def mount_sysfs(target_dir_func):
 def mount_etc_files(target_dir_func):
     tmpfs = tempfile.mkdtemp(prefix='.etc', dir=target_dir_func('/'))
     mount('tmpfs', tmpfs.encode('utf-8'), 'tmpfs', MS_NOEXEC | MS_NODEV | MS_NOSUID, 'size=1m')
-    for path in ('/etc/resolv.conf', '/etc/hosts', '/etc/hostname'):
-        content = open(path).read()
+
+    def write_and_mount_file(path, content):
         tmpfile = os.path.join(tmpfs, os.path.basename(path))
         with open(tmpfile, 'w') as fp:
             fp.write(content)
@@ -139,6 +140,13 @@ def mount_etc_files(target_dir_func):
         if not os.path.exists(target):
             open(target, 'w').close()
         bind_mount(tmpfile.encode('utf-8'), target.encode('utf-8'))
+
+    for path in ('/etc/resolv.conf', '/etc/hosts'):
+        content = open(path).read()
+        write_and_mount_file(path, content)
+
+    write_and_mount_file('/etc/hostname', socket.gethostname() + '\n')
+
     libc.umount2(tmpfs.encode('utf-8'), MNT_DETACH)
     os.rmdir(tmpfs)
 
