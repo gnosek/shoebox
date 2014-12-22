@@ -40,7 +40,7 @@ def run(container_id, shoebox_dir, index_url, command, entrypoint, user=None, wo
 
     shoebox_dir = os.path.expanduser(shoebox_dir)
 
-    if bridge != 'None':
+    if bridge != 'None' and ip is not None:
         private_net = PrivateNetwork(bridge, ip)
     else:
         private_net = None
