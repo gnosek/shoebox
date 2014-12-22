@@ -20,6 +20,7 @@ def cli(ctx, shoebox_dir, index_url, debug):
     ctx.obj = {
         'shoebox_dir': shoebox_dir,
         'repo': ImageRepository(index_url=index_url, storage_dir=storage_dir),
+        'logger': logging.getLogger('shoebox.cli')
     }
 
     if debug:
@@ -86,7 +87,7 @@ def tag_container(obj, container_id, tag, force):
     try:
         utils.tag_container(obj['shoebox_dir'], container_id, tag, force)
     except RuntimeError as exc:
-        click.echo(exc)
+        obj['logger'].error(exc)
         sys.exit(1)
 
 
@@ -97,5 +98,5 @@ def untag(obj, tag):
     try:
         utils.untag(obj['shoebox_dir'], tag)
     except RuntimeError as exc:
-        click.echo(exc)
+        obj['logger'].error(exc)
         sys.exit(1)
