@@ -87,11 +87,12 @@ ff02::2 ip6-allrouters
             sethostname(self.hostname)
 
         self.filesystem.build()
-        with open('/etc/hosts', 'w') as hosts:
-            print >> hosts, self.etc_hosts()
+        if self.filesystem.special_fs:
+            with open('/etc/hosts', 'w') as hosts:
+                print >> hosts, self.etc_hosts()
 
-        with open('/etc/resolv.conf', 'w') as resolv:
-            print >> resolv, resolvconf
+            with open('/etc/resolv.conf', 'w') as resolv:
+                print >> resolv, resolvconf
 
         drop_caps()
         os.setgroups([os.getgid()])
